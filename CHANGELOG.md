@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1 — 2026-11-01
+
+Docs only; the skill is unchanged.
+
+- README: what the skill does, a sample exchange, a one-line install, requirements and the fallback, a comparison with alternatives, FAQ.
+- `README.ru.md`: a short Russian version.
+- `assets/`: banner and how-it-works diagram as SVG, light and dark.
+- `docs/market.md`: research on alternatives and positioning (Russian).
+
 ## 0.1.0 — 2026-11-01
 
 First public version of the `orchestrate` skill.

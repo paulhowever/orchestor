@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" width="960" height="420" role="img" aria-label="How it works: one message is split; quick things are answered here, real tasks go to their own sessions with a model each; reports are checked against git and CI; your yes lands them one by one; finished sessions are archived.">
+  <style>
+    .bg { fill: #faf9f5; }
+    .card { fill: #ffffff; stroke: #d6d3c8; stroke-width: 1.5; }
+    .dash { fill: none; stroke: #d6d3c8; stroke-width: 1.5; stroke-dasharray: 5 4; }
+    .gate { fill: #f5e4dc; stroke: #c96442; stroke-width: 2; }
+    .ln { fill: none; stroke: #d6d3c8; stroke-width: 1.8; }
+    .lna { fill: none; stroke: #c96442; stroke-width: 2; }
+    .dot { fill: #1f1e1d; }
+    .h { font: 700 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; fill: #1f1e1d; }
+    .t { font: 400 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; fill: #1f1e1d; }
+    .m { font: 400 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #6b6a65; }
+    .s { font: 600 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; fill: #6b6a65; letter-spacing: 1.2px; }
+    .a { font: 700 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; fill: #c96442; }
+    .ok { fill: none; stroke: #3d7a4f; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+    .oka { fill: none; stroke: #c96442; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+    .title { font: 700 44px -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; fill: #1f1e1d; letter-spacing: -1px; }
+    .sub { font: 400 18px -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; fill: #6b6a65; }
+    .tag { font: 600 19px -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; fill: #1f1e1d; }
+    .taga { font: 600 19px -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; fill: #c96442; }
+  </style>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#d6d3c8"/>
+    </marker>
+    <marker id="ara" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c96442"/>
+    </marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="960" height="420" rx="18"/>
+
+  <text class="s" x="28" y="40">1 · YOUR MESSAGE</text>
+  <text class="s" x="276" y="40">2 · SPLIT AND RUN</text>
+  <text class="s" x="582" y="40">3 · CHECK</text>
+  <text class="s" x="764" y="40">4 · YOU DECIDE</text>
+
+  <rect class="card" x="28" y="60" width="200" height="320" rx="12"/>
+  <text class="h" x="46" y="90">One message</text>
+  <text class="t" x="46" y="128">• which Node do we run?</text>
+  <text class="t" x="46" y="160">• fix the login redirect</text>
+  <text class="t" x="46" y="192">• add CSV export</text>
+  <text class="t" x="46" y="224">• research rate limits</text>
+  <text class="m" x="46" y="356">/orchestrate</text>
+
+  <path class="ln" marker-end="url(#ar)" d="M228,124 C252,124 250,91 272,91"/>
+  <path class="ln" marker-end="url(#ar)" d="M228,156 C252,156 250,171 272,171"/>
+  <path class="ln" marker-end="url(#ar)" d="M228,188 C252,188 250,251 272,251"/>
+  <path class="ln" marker-end="url(#ar)" d="M228,220 C252,220 250,331 272,331"/>
+
+  <rect class="dash" x="276" y="64" width="250" height="54" rx="10"/>
+  <text class="t" x="292" y="87">quick thing → answered here</text>
+  <text class="m" x="292" y="106">no session needed</text>
+  <rect class="card" x="276" y="140" width="250" height="62" rx="10"/>
+  <text class="h" x="292" y="166">fix-login</text>
+  <text class="m" x="292" y="187">strongest · high · worktree</text>
+  <rect class="card" x="276" y="220" width="250" height="62" rx="10"/>
+  <text class="h" x="292" y="246">csv-export</text>
+  <text class="m" x="292" y="267">mid-tier · medium · worktree</text>
+  <rect class="card" x="276" y="300" width="250" height="62" rx="10"/>
+  <text class="h" x="292" y="326">rate-limit research</text>
+  <text class="m" x="292" y="347">smallest · low · read-only</text>
+
+  <path class="ln" marker-end="url(#ar)" d="M526,171 C552,171 552,220 578,220"/>
+  <path class="ln" marker-end="url(#ar)" d="M526,251 L578,251"/>
+  <path class="ln" marker-end="url(#ar)" d="M526,331 C552,331 552,282 578,282"/>
+
+  <rect class="card" x="582" y="140" width="148" height="222" rx="12"/>
+  <text class="h" x="598" y="168">Reports</text>
+  <text class="t" x="598" y="190">are claims.</text>
+  <text class="t" x="598" y="212">Check them:</text>
+  <path class="ok" d="M600,240 l5,5 l9,-10"/><text class="m" x="622" y="245">the diff</text>
+  <path class="ok" d="M600,270 l5,5 l9,-10"/><text class="m" x="622" y="275">git log</text>
+  <path class="ok" d="M600,300 l5,5 l9,-10"/><text class="m" x="622" y="305">CI, in CI</text>
+  <text class="m" x="598" y="344">not the report</text>
+
+  <path class="lna" marker-end="url(#ara)" d="M730,180 C748,180 746,105 760,105"/>
+
+  <rect class="gate" x="764" y="64" width="170" height="82" rx="41"/>
+  <text class="a" x="849" y="98" text-anchor="middle">your “yes”</text>
+  <text class="m" x="849" y="121" text-anchor="middle">“land A, then B”</text>
+
+  <path class="lna" marker-end="url(#ara)" d="M849,146 L849,180"/>
+  <rect class="card" x="764" y="184" width="170" height="70" rx="12"/>
+  <text class="h" x="780" y="212">Land in order</text>
+  <text class="m" x="780" y="234">rebase · re-check</text>
+
+  <path class="ln" marker-end="url(#ar)" d="M849,254 L849,288"/>
+  <rect class="card" x="764" y="292" width="170" height="70" rx="12"/>
+  <text class="h" x="780" y="320">Archive</text>
+  <text class="m" x="780" y="342">clean · merged</text>
+</svg>
