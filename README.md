@@ -7,11 +7,19 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
-  <a href="CHANGELOG.md"><img alt="Version 0.1.1" src="https://img.shields.io/badge/version-0.1.1-c96442"></a>
-  <img alt="Claude Code skill" src="https://img.shields.io/badge/Claude_Code-skill-555">
+  <a href="CHANGELOG.md"><img alt="Version 0.2.0" src="https://img.shields.io/badge/version-0.2.0-c96442"></a>
+  <img alt="Claude Code plugin" src="https://img.shields.io/badge/Claude_Code-plugin-555">
 </p>
 
 <p align="center"><a href="README.ru.md">По-русски</a></p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/demo-dark.svg">
+    <img alt="Animated demo: one message with four tasks; one answered right away, three sent to their own sessions; reports checked against CI; each branch lands only after you say yes; finished sessions archived." src="assets/demo-light.svg" width="100%">
+  </picture>
+  <br><sub>One message → sessions → checked reports → your yes → landed → archived.</sub>
+</p>
 
 **An orchestrator that ships nothing without your yes — and one yes covers one named action.**
 
@@ -64,15 +72,29 @@ A typical exchange, trimmed:
 
 > **Claude:** Archived. The batch is closed and summed up in the digest. Nothing waits on you.
 
-## Install in 30 seconds
+## Install
+
+As a plugin, from a terminal:
+
+```bash
+claude plugin install orchestrate --marketplace paulhowever/orchestor
+```
+
+or inside a Claude Code session:
+
+```
+/plugin install orchestrate --marketplace paulhowever/orchestor
+```
+
+Then open a new session in the Code tab and type `/orchestrate`. Updates: `claude plugin update orchestrate@orchestor`. (Older Claude Code: `/plugin marketplace add paulhowever/orchestor`, then `/plugin install orchestrate@orchestor`.)
+
+By hand, if you'd rather read and edit the skill in place:
 
 ```bash
 git clone https://github.com/paulhowever/orchestor.git ~/orchestor && mkdir -p ~/.claude/skills && ln -s ~/orchestor/skills/orchestrate ~/.claude/skills/orchestrate
 ```
 
-Open a new session in the Code tab and type `/orchestrate`. Update with `git -C ~/orchestor pull`.
-
-Per-project install, copying instead of symlinking, a second machine, uninstalling, and the optional [`CLAUDE.md.snippet`](CLAUDE.md.snippet) that makes Claude offer orchestration when you send a batch: see **[INSTALL.md](INSTALL.md)**.
+Use one way, not both. Per-project install, a second machine, uninstalling, and the optional [`CLAUDE.md.snippet`](CLAUDE.md.snippet) that makes Claude offer orchestration when you send a batch: see **[INSTALL.md](INSTALL.md)**.
 
 ## Requirements
 
@@ -127,7 +149,10 @@ Then it's not a job for `/orchestrate`; Claude simply does it.
 ## Files
 
 - [`skills/orchestrate/SKILL.md`](skills/orchestrate/SKILL.md): the skill itself
+- [`.claude-plugin/`](.claude-plugin): plugin manifest and the `orchestor` marketplace
 - [`INSTALL.md`](INSTALL.md): install, update, uninstall
+- [`docs/distribution.md`](docs/distribution.md): where the skill is listed and how to submit it
+- [`docs/launch/`](docs/launch): launch post drafts
 - [`CLAUDE.md.snippet`](CLAUDE.md.snippet): optional rule to ask once per project whether to orchestrate
 - [`docs/brainstorm.md`](docs/brainstorm.md): how v0.1.0 was reviewed and what changed
 - [`docs/market.md`](docs/market.md): alternatives and positioning (Russian)

@@ -7,6 +7,14 @@
 
 <p align="center"><a href="README.md">English</a></p>
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/demo-dark.svg">
+    <img alt="Анимация: одно сообщение с четырьмя задачами; одна решена сразу, три ушли в свои сессии; отчёты сверены с CI; каждая ветка выкатывается только после твоего «да»; готовые сессии в архиве." src="assets/demo-light.svg" width="100%">
+  </picture>
+  <br><sub>Одно сообщение → сессии → проверенные отчёты → твоё «да» → выкат → архив.</sub>
+</p>
+
 **Оркестратор, который ничего не выкатывает без твоего «да»: одно «да» — одно названное действие.**
 
 `/orchestrate` — скил для Claude Code. Пишешь одно сообщение с пачкой задач. Claude сразу отвечает на мелочи, на каждую настоящую задачу заводит отдельную сессию (свой worktree и ветка, модель под задачу), сам сверяет отчёты сессий с git и CI и приносит тебе только твои решения: выкатить это, заархивировать то.
@@ -29,11 +37,27 @@
 
 ## Установка
 
+Плагином, из терминала:
+
+```bash
+claude plugin install orchestrate --marketplace paulhowever/orchestor
+```
+
+или внутри сессии Claude Code:
+
+```
+/plugin install orchestrate --marketplace paulhowever/orchestor
+```
+
+Потом открой новую сессию во вкладке Code и набери `/orchestrate`. Обновление: `claude plugin update orchestrate@orchestor`. (Старый Claude Code: `/plugin marketplace add paulhowever/orchestor`, затем `/plugin install orchestrate@orchestor`.)
+
+Вручную, если хочешь читать и править скил на месте:
+
 ```bash
 git clone https://github.com/paulhowever/orchestor.git ~/orchestor && mkdir -p ~/.claude/skills && ln -s ~/orchestor/skills/orchestrate ~/.claude/skills/orchestrate
 ```
 
-Открой новую сессию во вкладке Code и набери `/orchestrate`. Обновление: `git -C ~/orchestor pull`. Остальное (установка в один проект, второй компьютер, удаление, необязательный [`CLAUDE.md.snippet`](CLAUDE.md.snippet)) — в [INSTALL.md](INSTALL.md).
+Выбери один способ, не оба. Остальное (установка в один проект, второй компьютер, удаление, необязательный [`CLAUDE.md.snippet`](CLAUDE.md.snippet)) — в [INSTALL.md](INSTALL.md).
 
 ## Требования
 

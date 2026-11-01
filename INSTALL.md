@@ -6,7 +6,31 @@
 - **A git repository** for each project you orchestrate. Sessions work in their own worktrees and branches.
 - Plain CLI, IDE extensions and claude.ai/code have no session tools. The skill still loads there: it falls back to subagents or to doing the work in one session, and says so.
 
-## Install
+## Install as a plugin (recommended)
+
+From a terminal (Claude Code 2.1.292 or later):
+
+```bash
+claude plugin install orchestrate --marketplace paulhowever/orchestor
+```
+
+Or inside a Claude Code session (2.1.275 or later):
+
+```
+/plugin install orchestrate --marketplace paulhowever/orchestor
+```
+
+On older versions, in two steps: `/plugin marketplace add paulhowever/orchestor`, then `/plugin install orchestrate@orchestor` (or `claude plugin marketplace add …` / `claude plugin install …` in a terminal).
+
+The plugin lands in `~/.claude`, which the desktop app's Code tab shares with the CLI, so a terminal install is enough. The skill runs as `/orchestrate` (its full plugin name is `/orchestrate:orchestrate`, if another command already uses `/orchestrate`).
+
+**Updates.** The plugin carries a version. Run `claude plugin update orchestrate@orchestor` (or `/plugin` → Marketplaces → update), or turn on auto-update for the `orchestor` marketplace in `/plugin`. [CHANGELOG.md](CHANGELOG.md) says what changed.
+
+**Uninstall.** `claude plugin uninstall orchestrate@orchestor`, and `claude plugin marketplace remove orchestor` to forget the marketplace.
+
+## Install by hand (clone + symlink)
+
+Use this if you want to read or edit the skill in place, or you don't use plugins. Pick one way: with both the plugin and the hand-installed skill you get two copies of the same skill.
 
 User-wide (every project):
 
@@ -20,13 +44,15 @@ The symlink keeps the skill in step with the clone. To copy instead: `cp -R ~/or
 
 One project only: put the folder at `<project>/.claude/skills/orchestrate/` instead.
 
-Optional: paste [`CLAUDE.md.snippet`](CLAUDE.md.snippet) into `~/.claude/CLAUDE.md`. With it, Claude asks once per project whether to orchestrate when you send several tasks in one message, and remembers the answer. Without it, the skill runs when you type `/orchestrate` (or when Claude matches a batch of tasks to the skill's description).
+## Optional: ask once per project
+
+Paste [`CLAUDE.md.snippet`](CLAUDE.md.snippet) into `~/.claude/CLAUDE.md`. With it, Claude asks once per project whether to orchestrate when you send several tasks in one message, and remembers the answer. Without it, the skill runs when you type `/orchestrate` (or when Claude matches a batch of tasks to the skill's description).
 
 ## Check
 
-Open a new session in the Code tab (skills load at session start) and type `/orchestrate`. Claude should load the skill and either ask whether to orchestrate in this project or start splitting your message. If `/orchestrate` is not offered, check that `~/.claude/skills/orchestrate/SKILL.md` exists (`ls -L` follows the symlink).
+Open a new session in the Code tab (skills load at session start) and type `/orchestrate`. Claude should load the skill and either ask whether to orchestrate in this project or start splitting your message. If `/orchestrate` is not offered: for the plugin, `claude plugin list` should show `orchestrate@orchestor` as enabled; for the hand install, check that `~/.claude/skills/orchestrate/SKILL.md` exists (`ls -L` follows the symlink).
 
-## Update
+## Update (hand install)
 
 ```bash
 git -C ~/orchestor pull
@@ -36,9 +62,9 @@ With the symlink, new sessions pick it up. With a copy, copy the folder again. [
 
 ## Second machine
 
-Repeat the clone and the symlink on the other machine, and `git pull` on both when you update. If you sync `~/.claude` some other way (a dotfiles repo, iCloud), sync the clone too, or use a copy instead of the symlink there. The per-project answer ("orchestrate here: yes/no") lives in Claude Code's project memory on each machine, so each machine asks once.
+With the plugin, run the install command there too. With the hand install, repeat the clone and the symlink on the other machine, and `git pull` on both when you update. If you sync `~/.claude` some other way (a dotfiles repo, iCloud), sync the clone too, or use a copy instead of the symlink there. The per-project answer ("orchestrate here: yes/no") lives in Claude Code's project memory on each machine, so each machine asks once.
 
-## Uninstall
+## Uninstall (hand install)
 
 ```bash
 rm -r ~/.claude/skills/orchestrate

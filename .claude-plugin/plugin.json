@@ -1,0 +1,14 @@
+{
+  "name": "orchestrate",
+  "displayName": "orchestrate",
+  "version": "0.2.0",
+  "description": "Split one message with several tasks into separate Claude desktop sessions (own worktree and branch, a model per task), check their reports against git and CI, and land nothing without your explicit yes.",
+  "author": {
+    "name": "Pavel Tischenko",
+    "url": "https://github.com/paulhowever"
+  },
+  "homepage": "https://github.com/paulhowever/orchestor",
+  "repository": "https://github.com/paulhowever/orchestor",
+  "license": "MIT",
+  "keywords": ["orchestration", "parallel-sessions", "worktrees", "approval-gate", "claude-desktop", "skill"]
+}
