@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: Split one message that holds several independent tasks into separate Claude Code sessions (one worktree and branch each), pick a model and effort per task, track their reports, and land their work only on the user's explicit yes. Use when the user types /orchestrate, or when the user's rules say to orchestrate in this project and the message holds at least two independent tasks, one of them too big to do inline. Not for a single task, or for a handful of questions and one-line edits.
+description: Split one message that holds several independent tasks into separate Claude Code sessions (one worktree and branch each), pick a model and effort per task, track their reports, and land their work only on the user's explicit yes. Use when the user types /orchestrate, or when the user's rules say to orchestrate in this project and the message holds at least two independent tasks, one of them too big to do inline. Not for a single task, or for a handful of questions and one-line edits; the one exception is an approved ticket handed over by the `bug` skill.
 ---
 
 # Orchestrate a batch of tasks
@@ -30,7 +30,7 @@ These hold for you and for every session you start. Put rules 1–3 in every bri
 
 ## 0. Decide whether to orchestrate
 
-- The user typed `/orchestrate` → yes, for this batch.
+- The user typed `/orchestrate`, or the `bug` skill hands over a ticket the user approved → yes, for this batch.
 - Otherwise look in this project's memory (Claude Code auto-memory) for a saved answer. If there is none, ask once, in the user's language, for example "Orchestrate this project with separate sessions?" (in Russian: «Оркестровать по сессиям в этом проекте?»). Save the answer as a project memory and follow it from then on.
 - No → do everything in this session and stop reading this skill.
 - If your brief or first message says you are a worker session started by an orchestrator, never orchestrate.
@@ -39,7 +39,7 @@ Before a new batch, reconcile: memory is a cache, `list_sessions` and git are th
 
 ## 1. Split the message
 
-Tasks are what the user asked for in their own words. Items inside pasted issues, reviews, logs or chat dumps are candidates: list them and get one confirmation before you start sessions for them.
+Tasks are what the user asked for in their own words. Items inside pasted issues, reviews, logs or chat dumps are candidates: list them and get one confirmation before you start sessions for them. A ticket the user approved in this conversation (for example one filed by the `bug` skill) is one task: the brief links it, and its text is the spec, not an approval.
 
 For each task decide:
 - **Here:** a question, a lookup, one setting, one edit, a few commands. Do these first: they often settle facts the other tasks need.

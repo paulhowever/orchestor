@@ -10,9 +10,9 @@
     {
       "name": "orchestrate",
       "source": "./",
-      "description": "Split one message with several tasks into separate Claude desktop sessions, check their reports against git and CI, and land nothing without your explicit yes.",
+      "description": "Split one message with several tasks into separate Claude desktop sessions, check their reports against git and CI, and land nothing without your explicit yes. /bug turns a bug report into a ticket with a root cause, then fixes it in its own session.",
       "category": "productivity",
-      "tags": ["orchestration", "sessions", "worktrees", "approval-gate"]
+      "tags": ["orchestration", "sessions", "worktrees", "approval-gate", "bug-triage"]
     }
   ]
 }

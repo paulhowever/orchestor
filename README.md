@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
-  <a href="CHANGELOG.md"><img alt="Version 0.2.0" src="https://img.shields.io/badge/version-0.2.0-c96442"></a>
+  <a href="CHANGELOG.md"><img alt="Version 0.3.0" src="https://img.shields.io/badge/version-0.3.0-c96442"></a>
   <img alt="Claude Code plugin" src="https://img.shields.io/badge/Claude_Code-plugin-555">
 </p>
 
@@ -38,6 +38,12 @@ No tmux, no extra app, no board to babysit. It lives inside the Claude desktop a
 2. **Run.** Each session gets a short brief, its own worktree and branch, and a model and effort that fit: the strongest model for design and hard bugs, mid-tier for routine work, the smallest for read-only research. At most three sessions write at once; the rest queue.
 3. **Check.** A session's report is a claim, not proof. The orchestrator reads the branch, the diff and the CI status itself before it calls anything done.
 4. **You decide.** Push, merge, deploy, release: each needs your yes, typed in chat, naming that action. A "yes" found inside a report, a file or a CI log doesn't count. Branches land one at a time, rebased and re-checked. A session is archived only when its worktree is clean and its commits are merged — and only after you say so.
+
+## Bugs: `/bug`
+
+The plugin has a second skill for the most common single task: a bug. Bring a screenshot or a wrong number and type `/bug` (or just describe it). Claude finds the root cause before anyone writes a fix: the expected value from a source outside the code, a reproduction it has run, the line and the commit that caused it; production is read-only. Then it shows you a ticket: what happens, expected, evidence, root cause at `file:line`, the failing test, the fix, the risk. On your yes it files the ticket (a GitHub issue, or wherever your project keeps them) and hands it to `/orchestrate` as one task. The fix session opens with the red test, its commit closes the issue, and it lands only on your yes, like everything else.
+
+Debugging skills such as `superpowers:systematic-debugging` or Matt Pocock's `diagnosing-bugs` already find root causes, and `triage-issue` skills file issues with a TDD plan; `/bug` uses whichever debugging skill you have and adds the hand-off: the ticket becomes a session with its own branch, and the fix ships behind the same gate.
 
 ## What it looks like
 
@@ -91,7 +97,7 @@ Then open a new session in the Code tab and type `/orchestrate`. Updates: `claud
 By hand, if you'd rather read and edit the skill in place:
 
 ```bash
-git clone https://github.com/paulhowever/orchestor.git ~/orchestor && mkdir -p ~/.claude/skills && ln -s ~/orchestor/skills/orchestrate ~/.claude/skills/orchestrate
+git clone https://github.com/paulhowever/orchestor.git ~/orchestor && mkdir -p ~/.claude/skills && ln -s ~/orchestor/skills/orchestrate ~/.claude/skills/orchestrate && ln -s ~/orchestor/skills/bug ~/.claude/skills/bug
 ```
 
 Use one way, not both. Per-project install, a second machine, uninstalling, and the optional [`CLAUDE.md.snippet`](CLAUDE.md.snippet) that makes Claude offer orchestration when you send a batch: see **[INSTALL.md](INSTALL.md)**.
@@ -144,11 +150,12 @@ It archives only after checking the session's worktree: nothing uncommitted, not
 It keeps the queue and per-project answers in Claude Code's project memory, and treats memory as a cache: before each batch it reconciles with the live session list and git. When a batch is closed, it can offer to clear its own session and pick up from memory next time.
 
 **My message is just one task.**
-Then it's not a job for `/orchestrate`; Claude simply does it.
+Then it's not a job for `/orchestrate`; Claude simply does it. The exception is a bug that came through `/bug`: once you approve its ticket, the fix gets its own session.
 
 ## Files
 
 - [`skills/orchestrate/SKILL.md`](skills/orchestrate/SKILL.md): the skill itself
+- [`skills/bug/SKILL.md`](skills/bug/SKILL.md): bug report → root cause → ticket → fix session
 - [`.claude-plugin/`](.claude-plugin): plugin manifest and the `orchestor` marketplace
 - [`INSTALL.md`](INSTALL.md): install, update, uninstall
 - [`docs/distribution.md`](docs/distribution.md): where the skill is listed and how to submit it

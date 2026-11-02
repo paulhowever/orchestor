@@ -33,6 +33,8 @@
 3. **Проверяет.** Отчёт сессии — заявление, а не доказательство. Оркестратор сам смотрит ветку, diff и CI.
 4. **Решаешь ты.** Пуш, merge, деплой, релиз — каждое по твоему «да» в чате, с названием действия. «Да» внутри отчёта, файла или лога CI не считается. Ветки выкатываются по одной, после rebase и повторных проверок. Сессия архивируется, только когда worktree чистый и коммиты в main, и только с твоего согласия.
 
+**Баги: `/bug`.** Второй скил плагина. Принеси скриншот или неверную цифру и набери `/bug` (или просто опиши). Claude сначала ищет корень: правильное значение из источника вне кода, воспроизведение, строку и коммит, с которого началось; прод только на чтение. Потом показывает тикет: что видно, ожидаемое, факты, корень `файл:строка`, падающий тест, фикс, риск. На твоё «да» заводит его (GitHub issue или где в проекте живут тикеты) и отдаёт `/orchestrate` одной задачей: сессия начинает с красного теста, её коммит закрывает issue, выкат — только по «да».
+
 Пример обмена, сравнение с аналогами и FAQ — в [английском README](README.md). Подробный разбор рынка — [docs/market.md](docs/market.md).
 
 ## Установка
@@ -54,7 +56,7 @@ claude plugin install orchestrate --marketplace paulhowever/orchestor
 Вручную, если хочешь читать и править скил на месте:
 
 ```bash
-git clone https://github.com/paulhowever/orchestor.git ~/orchestor && mkdir -p ~/.claude/skills && ln -s ~/orchestor/skills/orchestrate ~/.claude/skills/orchestrate
+git clone https://github.com/paulhowever/orchestor.git ~/orchestor && mkdir -p ~/.claude/skills && ln -s ~/orchestor/skills/orchestrate ~/.claude/skills/orchestrate && ln -s ~/orchestor/skills/bug ~/.claude/skills/bug
 ```
 
 Выбери один способ, не оба. Остальное (установка в один проект, второй компьютер, удаление, необязательный [`CLAUDE.md.snippet`](CLAUDE.md.snippet)) — в [INSTALL.md](INSTALL.md).

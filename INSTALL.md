@@ -22,7 +22,7 @@ Or inside a Claude Code session (2.1.275 or later):
 
 On older versions, in two steps: `/plugin marketplace add paulhowever/orchestor`, then `/plugin install orchestrate@orchestor` (or `claude plugin marketplace add …` / `claude plugin install …` in a terminal).
 
-The plugin lands in `~/.claude`, which the desktop app's Code tab shares with the CLI, so a terminal install is enough. The skill runs as `/orchestrate` (its full plugin name is `/orchestrate:orchestrate`, if another command already uses `/orchestrate`).
+The plugin lands in `~/.claude`, which the desktop app's Code tab shares with the CLI, so a terminal install is enough. The skills run as `/orchestrate` and `/bug` (full plugin names `/orchestrate:orchestrate` and `/orchestrate:bug`, if another command already uses the short name).
 
 **Updates.** The plugin carries a version. Run `claude plugin update orchestrate@orchestor` (or `/plugin` → Marketplaces → update), or turn on auto-update for the `orchestor` marketplace in `/plugin`. [CHANGELOG.md](CHANGELOG.md) says what changed.
 
@@ -38,11 +38,12 @@ User-wide (every project):
 git clone https://github.com/paulhowever/orchestor.git ~/orchestor
 mkdir -p ~/.claude/skills
 ln -s ~/orchestor/skills/orchestrate ~/.claude/skills/orchestrate
+ln -s ~/orchestor/skills/bug ~/.claude/skills/bug
 ```
 
-The symlink keeps the skill in step with the clone. To copy instead: `cp -R ~/orchestor/skills/orchestrate ~/.claude/skills/`.
+The `bug` skill is optional; skip its symlink if you only want `/orchestrate`. The symlink keeps the skill in step with the clone. To copy instead: `cp -R ~/orchestor/skills/orchestrate ~/orchestor/skills/bug ~/.claude/skills/`.
 
-One project only: put the folder at `<project>/.claude/skills/orchestrate/` instead.
+One project only: put the folders under `<project>/.claude/skills/` instead.
 
 ## Optional: ask once per project
 
@@ -67,7 +68,7 @@ With the plugin, run the install command there too. With the hand install, repea
 ## Uninstall (hand install)
 
 ```bash
-rm -r ~/.claude/skills/orchestrate
+rm -r ~/.claude/skills/orchestrate ~/.claude/skills/bug
 ```
 
-(`rm` without `-r` for the symlink.) Remove the snippet from `~/.claude/CLAUDE.md` if you added it.
+(`rm` without `-r` for the symlinks.) Remove the snippet from `~/.claude/CLAUDE.md` if you added it.
