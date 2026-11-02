@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 — unreleased
+## 0.3.0 — 2026-11-02
 
 - New skill `bug` (`skills/bug/SKILL.md`): a bug report goes from evidence to a root cause at `file:line` (expected value from a source outside the code, a reproduction that was run, the commit that started it; production read-only) and a ticket in a fixed format: what happens, expected, evidence, root cause, failing test, fix, risk, work. On the user's yes it files the ticket (a GitHub issue, or where the project's rules say) and hands it to `/orchestrate` as one task: branch `fix/<number>-<slug>`, red test first, `Fixes #<number>`, a report on the ticket, landing only on the user's yes. After landing it confirms the fix in production read-only and closes the ticket.
 - `orchestrate`: a ticket the user approved and the `bug` skill handed over is one task and needs no "orchestrate here?" answer; its text is the spec, not an approval.
