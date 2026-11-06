@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `orchestrate`: new section 3a, a budget before each batch. Read `get_usage`, estimate each task as a range, show a table against what is left until the reset, choose model and effort by it, say what to postpone if the batch does not fit, put a stop line in every brief, prefer a new session once context passes 50–60%, and log estimate against actual afterwards. Without `get_usage` it works in tokens and says percents are unknown.
+- `skills/orchestrate/usage.py` (no dependencies): tokens per session from `~/.claude/projects` transcripts (input, output, cache read/write, messages, model, one weighted figure by price ratios from the `claude-api` skill), filter by session and time; `log` / `estimate` keep an estimate-against-actual log and give a range per task type (fallback: context × steps); `calibrate` turns two `get_usage` readings into weighted tokens per 1% (refuses spans under 3%) and saves it with its date.
+
 ## 0.3.0 — 2026-11-02
 
 - New skill `bug` (`skills/bug/SKILL.md`): a bug report goes from evidence to a root cause at `file:line` (expected value from a source outside the code, a reproduction that was run, the commit that started it; production read-only) and a ticket in a fixed format: what happens, expected, evidence, root cause, failing test, fix, risk, work. On the user's yes it files the ticket (a GitHub issue, or where the project's rules say) and hands it to `/orchestrate` as one task: branch `fix/<number>-<slug>`, red test first, `Fixes #<number>`, a report on the ticket, landing only on the user's yes. After landing it confirms the fix in production read-only and closes the ticket.

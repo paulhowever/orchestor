@@ -71,6 +71,21 @@ Use the model names `start_session` accepts. Model names age; the split does not
 
 Name the model in the line that introduces each session, and say why when it is the strongest. Parallel sessions at high effort spend quota fast; weigh that on large batches.
 
+## 3a. Budget before you start
+
+Cost is mostly cached context re-read on every step, so it is about context size × steps, not about the model alone. `usage.py` next to this file (run `python3 <skill dir>/usage.py`; `--help` lists the commands) turns transcripts into one weighted figure per session and keeps the log and the calibration in `~/.claude/orchestrate/`.
+
+Before a batch:
+1. Read `get_usage` (load it with ToolSearch if deferred): the weekly and 5-hour percents and when they reset, and your own context fill.
+2. Estimate each task as a **range**, never one number: `usage.py estimate --type <kind>` (from past sessions of that kind; with fewer than 3 it says so and you give `--ctx` and `--steps LO-HI`). It prints percents once a calibration exists.
+3. Show a table: task, model, effort, estimated range, against what is left until the reset. Pick model and effort by that budget (section 3): a cheaper tier or lower effort for routine work when the budget is tight.
+4. If the batch does not fit, say what to postpone and to when; the user decides.
+5. Put a stop line in each brief: "stop at about N messages or X% of the weekly limit and report how far you got". Prefer a new session over a long one once context passes 50–60%.
+
+After a batch, for each finished session: `usage.py log --type <kind> --session <id> --est LO HI --effort <e>` (estimate against actual). To learn the percent rate, take two `get_usage` readings at least 3% apart, with their times: `usage.py calibrate 91@<time> 94@<time>`. The rate is saved with its date and drifts, so redo it now and then.
+
+Without `get_usage` (plain CLI), work in weighted tokens and say that percents are unknown. Without a calibration, say the same.
+
 ## 4. Write each brief
 
 Start each session with `start_session`: fresh context, its own worktree and branch (`use_worktree: true`) for anything that writes, a short name, the model and effort from section 3. A task in another repository starts with that repository as its folder (see `list_start_targets`); if you cannot start it there, give the user the brief to start by hand. Follow the tool's own schema for the other fields.
