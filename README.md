@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
-  <a href="CHANGELOG.md"><img alt="Version 0.3.0" src="https://img.shields.io/badge/version-0.3.0-c96442"></a>
+  <a href="CHANGELOG.md"><img alt="Version 0.4.0" src="https://img.shields.io/badge/version-0.4.0-c96442"></a>
   <img alt="Claude Code plugin" src="https://img.shields.io/badge/Claude_Code-plugin-555">
 </p>
 

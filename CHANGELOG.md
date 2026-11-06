@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 — 2026-11-07
 
 - `orchestrate`: new section 3a, a budget before each batch. Read `get_usage`, estimate each task as a range, show a table against what is left until the reset, choose model and effort by it, say what to postpone if the batch does not fit, put a stop line in every brief, prefer a new session once context passes 50–60%, and log estimate against actual afterwards. Without `get_usage` it works in tokens and says percents are unknown.
 - `skills/orchestrate/usage.py` (no dependencies): tokens per session from `~/.claude/projects` transcripts (input, output, cache read/write, messages, model, one weighted figure by price ratios from the `claude-api` skill), filter by session and time; `log` / `estimate` keep an estimate-against-actual log and give a range per task type (fallback: context × steps); `calibrate` turns two `get_usage` readings into weighted tokens per 1% (refuses spans under 3%) and saves it with its date.

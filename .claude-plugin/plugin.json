@@ -1,7 +1,7 @@
 {
   "name": "orchestrate",
   "displayName": "orchestrate",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Split one message with several tasks into separate Claude desktop sessions (own worktree and branch, a model per task), check their reports against git and CI, and land nothing without your explicit yes. Plus /bug: evidence, root cause and a ticket first, then the fix in its own session.",
   "author": {
     "name": "Pavel Tischenko",
