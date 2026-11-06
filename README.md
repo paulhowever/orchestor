@@ -160,6 +160,7 @@ Then it's not a job for `/orchestrate`; Claude simply does it. The exception is 
 - [`INSTALL.md`](INSTALL.md): install, update, uninstall
 - [`docs/distribution.md`](docs/distribution.md): where the skill is listed and how to submit it
 - [`docs/launch/`](docs/launch): launch post drafts
+- [`skills/orchestrate/usage.py`](skills/orchestrate/usage.py): optional helper for the budget step (tokens per session from your transcripts, estimate-against-actual log, calibration to limit percents); tests in `test_usage.py`
 - [`CLAUDE.md.snippet`](CLAUDE.md.snippet): optional rule to ask once per project whether to orchestrate
 - [`docs/brainstorm.md`](docs/brainstorm.md): how v0.1.0 was reviewed and what changed
 - [`docs/market.md`](docs/market.md): alternatives and positioning (Russian)

@@ -65,7 +65,8 @@ def parse_time(s):
 def scan(session=None, since=None, until=None):
     """-> {session_id: stats}. One entry per unique assistant message id (last copy wins)."""
     msgs = {}
-    for f in glob.glob(os.path.expanduser("~/.claude/projects/*/*.jsonl")):
+    root = os.environ.get("ORCHESTRATE_PROJECTS") or "~/.claude/projects"
+    for f in glob.glob(os.path.join(os.path.expanduser(root), "*", "*.jsonl")):
         if session and session not in os.path.basename(f):
             continue
         if since and datetime.fromtimestamp(os.path.getmtime(f), timezone.utc) < since:
