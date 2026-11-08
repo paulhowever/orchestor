@@ -106,14 +106,32 @@ The brief says:
 - worktree setup if the project needs it (copy `.env*` from the main checkout, install dependencies, use a free port);
 - show the plan to the user first if the design is not settled;
 - hard rules 1–3 above, word for word;
-- which sibling sessions own which files; on a rebase conflict in a file it does not own, stop and report instead of picking a side.
+- which sibling sessions own which files; on a rebase conflict in a file it does not own, stop and report instead of picking a side;
+- the receipt below, as the last block of every report.
+
+### Worker receipt
+
+Every report ends with this block, filled in, so you can check it against git instead of reading prose:
+
+```
+status: done | draft | blocked | ask
+branch: <branch> @ <short sha>
+commits: <n> on <base> (<first line of each, or "none">)
+checked: <command → result, one per line: tests, lint, typecheck, CI, review>
+open: <the one question for the user, or "none">
+tokens: <python3 <skill dir>/usage.py tokens --self>
+```
+
+- `done`: everything the brief asked for is committed and checked. `draft`: some of it is; the report says what is missing. `blocked`: it cannot go on without something outside its reach (access, a sibling's branch, a limit). `ask`: it waits on a decision from the user.
+- Ask for an honest `draft`: a partial result called `draft` is useful, a partial result called `done` costs a review round.
+- If `usage.py` is not reachable from the worker, it writes the message count and the minutes the session ran instead.
 
 ## 5. While they run
 
 - Do not poll. End your turn; session reports arrive on their own when a session ends a turn.
 - On each message from the user, check `list_sessions` once for this batch. A session that has not reported for a long time may be stuck on a prompt or a usage limit: look at it and tell the user.
 - When a session waits on the user (a plan, a push), tell them in one line with a link to that session.
-- A report is a claim, not proof. Check the branch, the diff and the CI status yourself before you call something done.
+- A report is a claim, not proof. Check its receipt against git yourself (the branch and sha exist, the commit count matches, the checks it lists pass when you run them or in CI) before you call something done. A report without a receipt: ask the session for one.
 - When the user states a rule for future batches ("always X", "never Y"), save it to project memory. When something in the digest turns out wrong, correct it.
 - A new batch while one runs: reconcile first (section 0), then check its files against the files running sessions own; overlapping tasks wait behind the session that owns those files.
 
@@ -121,6 +139,7 @@ The brief says:
 
 You own a landing queue: one session lands at a time, in an order you state.
 - Before landing, the session rebases its own branch on the current default branch and re-runs the full checks. It pushes its own branch only with `--force-with-lease`, and never force-pushes the default branch or another session's branch.
+- Then run `python3 <skill dir>/land_check.py <branch>` from the main checkout. It checks, in order: commits on top of the default branch, a fast-forward from it, a clean worktree, commit authors, required trailers, lint, tests; it prints `ok to land` or the first reason it cannot. Lint, test, trailer and author come from `land-check: lint = …` lines in the project's `CLAUDE.md` or from its arguments; offer the user to add those lines the first time. Ask for the yes only after `ok to land`, and quote that line in the question.
 - Ask the user for the yes (hard rule 1), naming the branch, the commits and the target. Use the project's landing path: a PR and merge, or a fast-forward push.
 - If the project deploys, start the next deploy only after the previous one is verified (version or log on the server, read-only).
 
@@ -132,7 +151,7 @@ A session is finished when its outcome is verified:
 
 Record this project's definition of done in memory the first time.
 
-Before archiving, check in the session's worktree: `git status --porcelain` is empty, `git stash list` is empty, and `git log <default-branch>..HEAD` is empty or every commit is confirmed squash-merged. If any check fails, do not archive; tell the user. List the sessions you will archive and get the user's yes in chat, then call `archive_session` with a short reason ("merged and deployed v1.4.2"); it also removes the worktree. Never archive a session that is running, waiting on the user, or has unmerged work. A session with more queued tasks stays open until its last one lands.
+Before archiving, run `python3 <skill dir>/land_check.py <branch> --archive`: nothing on the branch is missing from the default branch (as `git cherry` sees it, so a rebased commit counts as landed), the worktree is clean, and no stash entry was made on the branch. A squash-merged branch fails the first check: confirm the squash by its diff and say so. If any check fails, do not archive; tell the user. List the sessions you will archive and get the user's yes in chat, then call `archive_session` with a short reason ("merged and deployed v1.4.2"); it also removes the worktree. Never archive a session that is running, waiting on the user, or has unmerged work. A session with more queued tasks stays open until its last one lands.
 
 Never use `git branch -D`, `git worktree remove --force`, `git clean -fdx` or `git reset --hard` to clean up. Offer to delete merged task branches; delete them only on a yes.
 
