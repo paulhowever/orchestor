@@ -1,8 +1,8 @@
 {
   "name": "orchestrate",
   "displayName": "orchestrate",
-  "version": "0.4.0",
-  "description": "Split one message with several tasks into separate Claude desktop sessions (own worktree and branch, a model per task), check their reports against git and CI, and land nothing without your explicit yes. Plus /bug: evidence, root cause and a ticket first, then the fix in its own session.",
+  "version": "0.5.0",
+  "description": "Split one message with several tasks into separate Claude desktop sessions (own worktree and branch, a model per task), check their reports against git and CI, and land nothing without your explicit yes. Plus /bug: evidence, root cause and a ticket first, then the fix in its own session. And /arch-tutor: a read-only architecture map, glossary and risk review of a repository.",
   "author": {
     "name": "Pavel Tischenko",
     "url": "https://github.com/paulhowever"
@@ -10,5 +10,5 @@
   "homepage": "https://github.com/paulhowever/orchestor",
   "repository": "https://github.com/paulhowever/orchestor",
   "license": "MIT",
-  "keywords": ["orchestration", "parallel-sessions", "worktrees", "approval-gate", "bug-triage", "claude-desktop", "skill"]
+  "keywords": ["orchestration", "parallel-sessions", "worktrees", "approval-gate", "bug-triage", "architecture", "claude-desktop", "skill"]
 }

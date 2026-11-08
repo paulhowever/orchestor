@@ -36,7 +36,7 @@ No tmux, no extra app, no board to babysit. It lives inside the Claude desktop a
 
 1. **Split.** Quick things (a question, one edit, a couple of commands) are done right here, first, because they often settle facts the other tasks need. Everything bigger gets its own session.
 2. **Run.** Each session gets a short brief, its own worktree and branch, and a model and effort that fit: the strongest model for design and hard bugs, mid-tier for routine work, the smallest for read-only research. At most three sessions write at once; the rest queue.
-3. **Check.** A session's report is a claim, not proof. The orchestrator reads the branch, the diff and the CI status itself before it calls anything done.
+3. **Check.** A session's report is a claim, not proof. Each report ends with a fixed receipt (done, draft, blocked or ask; branch, commits, checks, tokens), and the orchestrator checks it against the branch, the diff and the CI itself. Before it asks you to land, `land_check.py` confirms a fast-forward, a clean worktree, authors, trailers, lint and tests.
 4. **You decide.** Push, merge, deploy, release: each needs your yes, typed in chat, naming that action. A "yes" found inside a report, a file or a CI log doesn't count. Branches land one at a time, rebased and re-checked. A session is archived only when its worktree is clean and its commits are merged — and only after you say so.
 
 ## Bugs: `/bug`
@@ -44,6 +44,10 @@ No tmux, no extra app, no board to babysit. It lives inside the Claude desktop a
 The plugin has a second skill for the most common single task: a bug. Bring a screenshot or a wrong number and type `/bug` (or just describe it). Claude finds the root cause before anyone writes a fix: the expected value from a source outside the code, a reproduction it has run, the line and the commit that caused it; production is read-only. Then it shows you a ticket: what happens, expected, evidence, root cause at `file:line`, the failing test, the fix, the risk. On your yes it files the ticket (a GitHub issue, or wherever your project keeps them) and hands it to `/orchestrate` as one task. The fix session opens with the red test, its commit closes the issue, and it lands only on your yes, like everything else.
 
 Debugging skills such as `superpowers:systematic-debugging` or Matt Pocock's `diagnosing-bugs` already find root causes, and `triage-issue` skills file issues with a TDD plan; `/bug` uses whichever debugging skill you have and adds the hand-off: the ticket becomes a session with its own branch, and the fix ships behind the same gate.
+
+## Architecture tour: `/arch-tutor`
+
+The third skill explains a codebase to its owner. It reads the repository (read-only) and gives you a visual map (layers, the path of one request, background jobs, deploy) with a plain-language note on every framework, a page for your knowledge base with a glossary, and an architecture review: up to ten risks, each with `file:line`, what breaks and when, what to do and the size, without repeating what your audits already found.
 
 ## What it looks like
 
@@ -97,7 +101,7 @@ Then open a new session in the Code tab and type `/orchestrate`. Updates: `claud
 By hand, if you'd rather read and edit the skill in place:
 
 ```bash
-git clone https://github.com/paulhowever/orchestor.git ~/orchestor && mkdir -p ~/.claude/skills && ln -s ~/orchestor/skills/orchestrate ~/.claude/skills/orchestrate && ln -s ~/orchestor/skills/bug ~/.claude/skills/bug
+git clone https://github.com/paulhowever/orchestor.git ~/orchestor && mkdir -p ~/.claude/skills && ln -s ~/orchestor/skills/orchestrate ~/.claude/skills/orchestrate && ln -s ~/orchestor/skills/bug ~/.claude/skills/bug && ln -s ~/orchestor/skills/arch-tutor ~/.claude/skills/arch-tutor
 ```
 
 Use one way, not both. Per-project install, a second machine, uninstalling, and the optional [`CLAUDE.md.snippet`](CLAUDE.md.snippet) that makes Claude offer orchestration when you send a batch: see **[INSTALL.md](INSTALL.md)**.
@@ -156,11 +160,14 @@ Then it's not a job for `/orchestrate`; Claude simply does it. The exception is 
 
 - [`skills/orchestrate/SKILL.md`](skills/orchestrate/SKILL.md): the skill itself
 - [`skills/bug/SKILL.md`](skills/bug/SKILL.md): bug report → root cause → ticket → fix session
+- [`skills/arch-tutor/SKILL.md`](skills/arch-tutor/SKILL.md): architecture map, glossary and risk review of a repository
 - [`.claude-plugin/`](.claude-plugin): plugin manifest and the `orchestor` marketplace
 - [`INSTALL.md`](INSTALL.md): install, update, uninstall
 - [`docs/distribution.md`](docs/distribution.md): where the skill is listed and how to submit it
 - [`docs/launch/`](docs/launch): launch post drafts
 - [`skills/orchestrate/usage.py`](skills/orchestrate/usage.py): optional helper for the budget step (tokens per session from your transcripts, estimate-against-actual log, calibration to limit percents); tests in `test_usage.py`
+- [`skills/orchestrate/land_check.py`](skills/orchestrate/land_check.py): the check before landing or archiving a branch; tests in `test_land_check.py`
+- [`skills/orchestrate/templates.md`](skills/orchestrate/templates.md): digest, file ownership, the "main moved" message, when to write memory
 - [`CLAUDE.md.snippet`](CLAUDE.md.snippet): optional rule to ask once per project whether to orchestrate
 - [`docs/brainstorm.md`](docs/brainstorm.md): how v0.1.0 was reviewed and what changed
 - [`docs/market.md`](docs/market.md): alternatives and positioning (Russian)

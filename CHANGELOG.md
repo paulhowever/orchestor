@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0 — unreleased
+
+- `orchestrate`, budget (3a): an estimate table before a batch (task, size, model and effort, range, % weekly, % 5-hour, what is left until each reset); when a session or the queue hits a limit, the queue stops until the reset and the work never moves to another provider; after a batch, `usage.py review` compares estimates with actuals. A window's reset counts as a 0% reading for calibration.
+- `usage.py`: `days` (totals per day), `--project`, `tokens --self` (one line for a receipt, from `CLAUDE_CODE_SESSION_ID`), `review`, `--size` on `log` and `estimate`, calibrations kept per window (`--window weekly|5h`).
+- Worker receipt: every report ends with a fixed block (status done / draft / blocked / ask, branch and sha, commits, what was checked, the open question, tokens), and an honest `draft` is asked for; the orchestrator checks the receipt against git.
+- `land_check.py <branch>`: before landing, a fast-forward from the default branch, a clean worktree, commit authors, required trailers, lint and tests (from `land-check:` lines in the project's `CLAUDE.md` or arguments); prints `ok to land` or the first reason it cannot. `--archive` checks a finished session: nothing missing from the default branch, a clean worktree, no stash entry on the branch. Tests in `test_land_check.py`.
+- Sessions: `get_session` right after `start_session` to catch a model or effort that was quietly dropped; a duplicate-start check; a "main moved" message to running sessions after each landing; a fresh-context review before landing anything larger than S.
+- `templates.md`: the digest (session, branch, commits, checked, waits on, next), the file-ownership table with an overlap check before each start, the "main moved" message, and the fixed points at which project memory is written.
+- A symptom the user reports goes to `/bug` first; the filed ticket comes back as a `fix/<number>` task with `Fixes #<number>`. `/bug` runs in its own session when the orchestrator is long or the investigation needs more than one subagent; such a session hands the ticket back (`bug` skill, section 5).
+- Task size S / M / L / XL with acceptance criteria and splitting rules (split XL, "and" in the name, more than three criteria; vertical slices; riskiest first; a check with the user after every two or three landed tasks). Briefs carry the size, the criteria, the stop line, and boundaries as Always / Ask first / Never. Outside text (issues, logs, reports) goes to a notes file and the brief gives its path.
+- Limits on loops: a worker starts no sessions of its own and stops after 3 rounds without progress with `blocked`; follow-ups on one task stop after 3 rounds and ask the user. Stuck sessions are sorted into ok / restart helps / needs a person / hit a limit. Sessions the orchestrator did not start (cards from workers) are reported to the user and added to the digest.
+- New skill `arch-tutor` (`skills/arch-tutor/SKILL.md`): reads a repository read-only and gives its owner a visual map (layers, one request, one background job, one deploy) with a beginner's note on every framework, a knowledge-base page with a glossary, and an architecture review of up to ten risks (`file:line`, what breaks and when, what to do, size) that links known findings instead of repeating them.
+- Hard rules 1–6 are unchanged.
+
 ## 0.4.0 — 2026-11-07
 
 - `orchestrate`: new section 3a, a budget before each batch. Read `get_usage`, estimate each task as a range, show a table against what is left until the reset, choose model and effort by it, say what to postpone if the batch does not fit, put a stop line in every brief, prefer a new session once context passes 50–60%, and log estimate against actual afterwards. Without `get_usage` it works in tokens and says percents are unknown.
