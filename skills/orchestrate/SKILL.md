@@ -122,6 +122,8 @@ Split a task when it is XL, when its name joins two things with "and", when it h
 
 Start each session with `start_session`: fresh context, its own worktree and branch (`use_worktree: true`) for anything that writes, a short name, the model and effort from section 3. A task in another repository starts with that repository as its folder (see `list_start_targets`); if you cannot start it there, give the user the brief to start by hand. Follow the tool's own schema for the other fields.
 
+Before each start, check that no session already holds this task: look in `list_sessions` and the digest for the same task, ticket or branch. If one exists, send it a follow-up instead of starting a second one; if it is archived or failed, say so and ask before starting again.
+
 Right after each start, call `get_session` on the new session and compare its model and effort with what you asked for. `start_session` can quietly drop an effort above your own or a model that costs more than yours. If they differ, fix them with `set_session_model` / `set_session_effort` and check again; if that does not take, tell the user in one line and note it in the digest.
 
 The brief says:
@@ -137,7 +139,8 @@ The brief says:
   - **Never:** push, merge, deploy or tag; change permission modes; start other sessions; copy secrets into code, commits or reports.
 - hard rules 1–3 above, word for word;
 - which sibling sessions own which files; on a rebase conflict in a file it does not own, stop and report instead of picking a side;
-- the receipt below, as the last block of every report.
+- the receipt below, as the last block of every report;
+- the depth and stall limits: it starts no sessions of its own (it may propose them as cards, which come to you), and after 3 rounds without progress (the same failing test, the same error, no new commit) it stops and reports what it tried with status `blocked`.
 
 ### Worker receipt
 
@@ -159,7 +162,13 @@ tokens: <python3 <skill dir>/usage.py tokens --self>
 ## 5. While they run
 
 - Do not poll. End your turn; session reports arrive on their own when a session ends a turn.
-- On each message from the user, check `list_sessions` once for this batch. A session that has not reported for a long time may be stuck on a prompt or a usage limit: look at it and tell the user.
+- On each message from the user, check `list_sessions` once for this batch. A session that has not reported for a long time is one of:
+  - **ok**: working, its last activity is recent; leave it.
+  - **restart helps**: an error loop, a lost connection, a crashed tool; tell the user and offer a follow-up message or a fresh session from its last commit.
+  - **needs a person**: waiting on a permission prompt, a plan approval or a question; give the user its link (hard rule 4: you do not answer for them).
+  - **hit a limit**: stopped on a usage limit; note when it resets (`get_usage`) and hold the queue until then.
+- Sessions you did not start (a card a worker proposed, a session the user started from one) are not yours until the user says so. When one appears in `list_sessions` linked to this batch, tell the user and add it to the digest; check its files against the Files table.
+- Follow-ups on one task: after 3 rounds of "fix this" on the same session without the task getting to `done`, stop sending them and ask the user whether to change the approach, split the task or drop it.
 - When a session waits on the user (a plan, a push), tell them in one line with a link to that session.
 - A report is a claim, not proof. Check its receipt against git yourself (the branch and sha exist, the commit count matches, the checks it lists pass when you run them or in CI) before you call something done. A report without a receipt: ask the session for one.
 - When the user states a rule for future batches ("always X", "never Y"), save it to project memory. When something in the digest turns out wrong, correct it.
@@ -169,6 +178,7 @@ tokens: <python3 <skill dir>/usage.py tokens --self>
 
 You own a landing queue: one session lands at a time, in an order you state.
 - Before landing, the session rebases its own branch on the current default branch and re-runs the full checks. It pushes its own branch only with `--force-with-lease`, and never force-pushes the default branch or another session's branch.
+- Get a review from a fresh context before landing anything larger than S: the project's code-review skill or a reviewer subagent that sees the diff, not the worker's reasoning. Findings go back to the session as one follow-up.
 - Then run `python3 <skill dir>/land_check.py <branch>` from the main checkout. It checks, in order: commits on top of the default branch, a fast-forward from it, a clean worktree, commit authors, required trailers, lint, tests; it prints `ok to land` or the first reason it cannot. Lint, test, trailer and author come from `land-check: lint = …` lines in the project's `CLAUDE.md` or from its arguments; offer the user to add those lines the first time. Ask for the yes only after `ok to land`, and quote that line in the question.
 - Ask the user for the yes (hard rule 1), naming the branch, the commits and the target. Use the project's landing path: a PR and merge, or a fast-forward push.
 - If the project deploys, start the next deploy only after the previous one is verified (version or log on the server, read-only).
