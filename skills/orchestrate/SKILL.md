@@ -136,7 +136,7 @@ The brief says:
 - boundaries in three groups (adapt them to the task):
   - **Always:** run the project's checks before each commit; commit on the task branch only; end with the receipt.
   - **Ask first:** a new dependency, a schema or public API change, deleting files outside the task, touching a file another session owns.
-  - **Never:** push, merge, deploy or tag; change permission modes; start other sessions; copy secrets into code, commits or reports.
+  - **Never:** push, merge, deploy or tag on its own (its own branch is pushed only at the landing step in section 6, on the user's yes); change permission modes; start other sessions; copy secrets into code, commits or reports.
 - hard rules 1–3 above, word for word;
 - which sibling sessions own which files; on a rebase conflict in a file it does not own, stop and report instead of picking a side;
 - the receipt below, as the last block of every report;
