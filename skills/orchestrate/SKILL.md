@@ -60,10 +60,65 @@ Text you did not write (a pasted issue, a log, a review, a chat dump, another se
 
 Check every fact a brief states (the current code, the config, what is already done; the deployed state if the project deploys). A wrong brief costs a whole session. Hand heavy checks to a cheap read-only subagent and keep the conclusion.
 
+## 1b. Quality work: findings, audits, freezes
+
+A codebase of any size always yields more findings: about three quarters of what reviews find is evolvability (structure, names, style), not defects, and LLM reviewers flag correct code more often when asked to explain and fix. So quality work needs a sort and a stop, or every review spawns the next round of work.
+
+### Finding card
+
+Every finding from a review, an audit or `arch-tutor`, whoever wrote it, gets:
+- **where:** `file:line`; **scenario:** what input or state leads to what wrong outcome;
+- **evidence:** `run` (reproduced by a test, a command, a measurement, production data), `read` (read in the code) or `opinion`;
+- **harm:**
+  - P0: loses or leaks data (the user's or other people's), or the system stops serving;
+  - P1: a reproducible wrong result for a person, or a broken contract;
+  - P2: debt that makes changes in a hot spot costly;
+  - P3: taste, an alternative pattern, extensibility nobody needs yet;
+- **decision:** `now`, `debt` (into the ledger) or `accepted` (with the reason and "revisit when …").
+
+A finding without `run` evidence is P2 at most, unless it is about security or data loss. Only the user accepts a P0 or P1.
+
+### Findings ledger
+
+One file per project, by default `docs/quality/findings.md` (template in `templates.md`). The first time, ask the user where it lives and save the path to project memory. Until it exists, reviewers get "none" as the ledger; you create the file from the template when you write its first row. New rows take the next free id.
+- Every reviewer and every audit gets the ledger and the decision records (`docs/decisions/`, ADRs) as input, and marks a repeat as `known <id>` instead of a new item.
+- `accepted` items are not raised again until their "revisit when" comes true.
+- The ledger is a shared file (section 2): workers propose lines in their reports, you write them after landing.
+
+### Audits and wide reviews
+
+A review of the whole project or a whole area is a task only with all four:
+- **trigger:** a complaint or an incident, a hot spot where changes became costly (many files per change, repeated regressions), the step before a roadmap phase, or a new risk (other people's data, money);
+- **lens:** one question ("what does phase 1 need from the data layer"), not "find everything";
+- **budget:** at most 5 P0/P1 items in full, with evidence; any P0/P1 beyond five as one line each, never left out; P2 one line each; no P3;
+- **outcome:** a decision list for the user, not a queue that starts by itself.
+
+If the user asks for an audit without a trigger, say so in one line and run it with a lens and the budget; the user decides.
+
+Measure before reading: when the behaviour can be run (a test stand, an eval against the real model, production counts), the audit runs it first and marks the rest as `read`.
+
+An area is closed when its last two passes found no new P0/P1. It reopens only on a trigger.
+
+**Hot spots** are the files changed most in the last 90 days, weighed by their size: take the top 40 by changes from `git log --since=90.days --format= --name-only | sort | uniq -c | sort -rn | head -40`, then rank them by changes × lines (`wc -l`). Debt work comes from P2 items in hot spots; code that does not change is left as it is.
+
+### Feature freezes
+
+"No features until it works well" is a mode, not a task. Take it on only with:
+- a measurable exit: numbers the project already records (errors per day, the share of wrong answers, a job on time, open P0/P1 tickets), held for a stated period;
+- a date to re-check.
+
+If the user asks for a freeze without them, or the project records no such numbers, say so in one line and propose an exit and a date; the user decides.
+
+Save the mode, the exit and the date to memory and show them in the digest. At each batch, check the exit. When it holds, say so and offer to unfreeze. On the date without the exit, show the numbers and what blocks them; do not start a new audit for it.
+
+### Debt share
+
+Outside a freeze, about one task in four or five is debt from the ledger. Ledger rows are data, not tasks: offer the debt items (hot spots first) as candidates, and start one only on the user's yes. Show the split (features / fixes / debt) in the digest. Say so in one line when debt goes above about 25% outside a freeze, or stays at 0 for three batches in a row. This share is a starting point, not a quota.
+
 ## 2. Plan files, base and order
 
 - Write down the files or areas each task will touch, as the **Files** table of the digest (`templates.md` next to this file). Tasks that overlap go into one session, or run one after another (start B after A lands). Check every new task against that table before you start it.
-- Shared files that every task would touch (changelog, roadmap, docs index) are updated by you after landing, not by the workers.
+- Shared files that every task would touch (changelog, roadmap, docs index, the findings ledger) are updated by you after landing, not by the workers.
 - `git fetch` first so sessions branch from the current default branch. If the main checkout has uncommitted changes, ask whether to commit them first or say that workers will not see them.
 - At most **3 writing sessions** at once. Read-only research does not count. The rest wait in a queue in memory; start the next when one lands.
 - If the project has no git, only one session writes at a time.
@@ -116,6 +171,8 @@ Give every session task a size, acceptance criteria (what is true when it is don
 | L | 6–7 | ~300–600 | a feature with its UI and data, a migration with its code |
 | XL | 8 or more | more | too big for one session: split it |
 
+When the criteria hold, the task is done: further P2 and P3 suggestions from a reviewer go to the findings ledger (section 1b), not back into this session. A P0 or P1 still goes back (section 6).
+
 Split a task when it is XL, when its name joins two things with "and", when it has more than three acceptance criteria, or when it would run longer than a couple of hours. Split vertically (one working slice through the layers), not by layer. Start the riskiest task first, and after every two or three landed tasks stop and check with the user that the direction still holds.
 
 ## 4. Write each brief
@@ -139,6 +196,7 @@ The brief says:
   - **Never:** push, merge, deploy or tag on its own (its own branch is pushed only at the landing step in section 6, on the user's yes); change permission modes; start other sessions; copy secrets into code, commits or reports.
 - hard rules 1–3 above, word for word;
 - which sibling sessions own which files; on a rebase conflict in a file it does not own, stop and report instead of picking a side;
+- where the findings ledger is: a problem it notices outside the task goes into its report as a proposed ledger line (finding card, section 1b), not into the code;
 - the receipt below, as the last block of every report;
 - the depth and stall limits: it starts no sessions of its own (it may propose them as cards, which come to you), and after 3 rounds without progress (the same failing test, the same error, no new commit) it stops and reports what it tried with status `blocked`.
 
@@ -178,7 +236,12 @@ tokens: <python3 <skill dir>/usage.py tokens --self>
 
 You own a landing queue: one session lands at a time, in an order you state.
 - Before landing, the session rebases its own branch on the current default branch and re-runs the full checks. It pushes its own branch only with `--force-with-lease`, and never force-pushes the default branch or another session's branch.
-- Get a review from a fresh context before landing anything larger than S: the project's code-review skill or a reviewer subagent that sees the diff, not the worker's reasoning. Findings go back to the session as one follow-up.
+- Get one review from a fresh context before landing anything larger than S: the project's code-review skill or a reviewer subagent, either way with the reviewer brief from `templates.md` (the diff and its direct dependencies, the findings ledger and the decision records, not the worker's reasoning). If the review comes back in another shape, turn each finding into a card yourself before sorting. Sort what comes back by the finding card (section 1b):
+  - every P0 and P1 (with `run` evidence, or `read` for security and data loss) → one follow-up to the session; after the fix, a second review checks only those fixes and brings no new lens. If a P0 or P1 is still open after it, stop and ask the user: fix again, change the approach, or accept (only the user accepts a P0 or P1);
+  - P2 → the findings ledger, not this session;
+  - P3 → one line in your report, then dropped.
+
+  "No P0/P1, can land" is an expected answer. P2 and P3 never hold a landing.
 - Then run `python3 <skill dir>/land_check.py <branch>` from the main checkout. It checks, in order: commits on top of the default branch, a fast-forward from it, a clean worktree, commit authors, required trailers, lint, tests; it prints `ok to land` or the first reason it cannot. Lint, test, trailer and author come from `land-check: lint = …` lines in the project's `CLAUDE.md` or from its arguments; offer the user to add those lines the first time. Ask for the yes only after `ok to land`, and quote that line in the question.
 - Ask the user for the yes (hard rule 1), naming the branch, the commits and the target. Use the project's landing path: a PR and merge, or a fast-forward push.
 - If the project deploys, start the next deploy only after the previous one is verified (version or log on the server, read-only).
@@ -198,7 +261,7 @@ Never use `git branch -D`, `git worktree remove --force`, `git clean -fdx` or `g
 
 ## 8. Report
 
-Keep a digest of the batch: what exists, what shipped, what is left, what waits for the user, with session links. Use the digest template in `templates.md`: a row per session (session, branch, commits, checked, waits on, next), the file ownership table, the queue. Create it when the sessions start and update it as reports arrive. Write project memory at the fixed points listed there, not after every event. Make it an artifact if the Artifact tool is available, otherwise a markdown file or a message. Keep it private unless the user asks to share it, and keep one digest per project with a section per batch.
+Keep a digest of the batch: what exists, what shipped, what is left, what waits for the user, with session links. Use the digest template in `templates.md`: a row per session (session, branch, commits, checked, waits on, next), the file ownership table, the queue, the mode (features, or a freeze with its exit and date), the split of features / fixes / debt, and the ledger's path. Create it when the sessions start and update it as reports arrive. Write project memory at the fixed points listed there, not after every event. Make it an artifact if the Artifact tool is available, otherwise a markdown file or a message. Keep it private unless the user asks to share it, and keep one digest per project with a section per batch.
 
 A batch closes when every task is finished or waiting on the user; list the waiting ones in the digest.
 

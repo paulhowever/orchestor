@@ -55,7 +55,7 @@ On "file only", file it and stop; if the user later says to fix it, start from s
 5. **Failing test** — test file and name, input, the assertion that is red today.
 6. **Fix** — the chosen option; rejected ones in a line each.
 7. **Risk** — what else uses this path; stored data to repair; how to confirm the fix in production.
-8. **Work** — size, files the fix session owns, model and effort.
+8. **Work** — harm P0–P3 (the `orchestrate` finding card, section 1b), size, files the fix session owns, model and effort.
 
 ## 5. Hand over to /orchestrate
 

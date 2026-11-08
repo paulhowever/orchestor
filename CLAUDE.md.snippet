@@ -1,3 +1,7 @@
 ## Several tasks in one message
 <!-- Optional rule for ~/.claude/CLAUDE.md, used with the `orchestrate` skill. -->
 Quick things (a question, one edit, a couple of commands) are always done right here. If one message holds two or more independent tasks and at least one is more than a quick thing, look in this project's memory for how I want to work here. If nothing is saved, ask once, in my language: "Orchestrate this project with separate sessions?" (in Russian: «Оркестровать по сессиям в этом проекте?»), and save my answer to the project memory. Yes → follow the `/orchestrate` skill. No → do everything in this session. Don't ask inside a worker session started by an orchestrator, or where session tools are missing (then just work here, or use subagents as the skill describes).
+
+## Review findings
+<!-- Optional rule, used with the `orchestrate` skill (section 1b) outside orchestrated batches too. -->
+Every review or audit finding gets a harm level and evidence: P0 data loss or leak, or the system down; P1 a reproducible wrong result; P2 debt in a hot spot; P3 taste. Without a run (a test, a command, production data) it is P2 at most, except security and data loss. P0/P1 are fixed (or a fix is proposed, when I only asked for a review); P2 goes to the project's findings ledger (`docs/quality/findings.md` unless the project says otherwise); P3 is dropped. Accepted ledger items are not raised again. A wide audit needs a trigger, one question and a budget of five P0/P1 items.

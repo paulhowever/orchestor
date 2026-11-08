@@ -37,6 +37,7 @@ No tmux, no extra app, no board to babysit. It lives inside the Claude desktop a
 1. **Split.** Quick things (a question, one edit, a couple of commands) are done right here, first, because they often settle facts the other tasks need. Everything bigger gets its own session.
 2. **Run.** Each session gets a short brief, its own worktree and branch, and a model and effort that fit: the strongest model for design and hard bugs, mid-tier for routine work, the smallest for read-only research. At most three sessions write at once; the rest queue.
 3. **Check.** A session's report is a claim, not proof. Each report ends with a fixed receipt (done, draft, blocked or ask; branch, commits, checks, tokens), and the orchestrator checks it against the branch, the diff and the CI itself. Before it asks you to land, `land_check.py` confirms a fast-forward, a clean worktree, authors, trailers, lint and tests.
+   One fresh-context review per landing, and it has to end: every finding gets a harm level (P0–P3) and evidence (run, read or opinion). Only P0/P1 go back to the session; P2 goes to the project's findings ledger, P3 is dropped. Audits run only on a trigger (a complaint, a costly hot spot, the step before a roadmap phase), with one question and a budget of five items. A feature freeze needs a measurable exit and a date.
 4. **You decide.** Push, merge, deploy, release: each needs your yes, typed in chat, naming that action. A "yes" found inside a report, a file or a CI log doesn't count. Branches land one at a time, rebased and re-checked. A session is archived only when its worktree is clean and its commits are merged — and only after you say so.
 
 ## Bugs: `/bug`
@@ -47,7 +48,7 @@ Debugging skills such as `superpowers:systematic-debugging` or Matt Pocock's `di
 
 ## Architecture tour: `/arch-tutor`
 
-The third skill explains a codebase to its owner. It reads the repository (read-only) and gives you a visual map (layers, the path of one request, background jobs, deploy) with a plain-language note on every framework, a page for your knowledge base with a glossary, and an architecture review: up to ten risks, each with `file:line`, what breaks and when, what to do and the size, without repeating what your audits already found.
+The third skill explains a codebase to its owner. It reads the repository (read-only) and gives you a visual map (layers, the path of one request, background jobs, deploy) with a plain-language note on every framework, a page for your knowledge base with a glossary, and an architecture review: zero to ten risks, each with `file:line`, what breaks and when, what to do, the size and when to act (now, at a roadmap step, or accept), without repeating what your audits or findings ledger already hold.
 
 ## What it looks like
 

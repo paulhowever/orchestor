@@ -52,7 +52,9 @@ The page holds:
 
 ## 5. Architecture review
 
-Up to ten risks, most dangerous first. Architecture means structure: coupling, single points of failure, data flow, boundaries, what breaks on growth, deploy and recovery. Not style, not single bugs.
+Zero to ten risks, most dangerous first. Architecture means structure: coupling, single points of failure, data flow, boundaries, what breaks on growth, deploy and recovery. Not style, not single bugs. List only risks with a named moment when they break; fewer than ten is normal, and "nothing here blocks the next roadmap step" is a valid conclusion, said plainly. Do not fill the list.
+
+Read the project's findings ledger (by default `docs/quality/findings.md`, see the `orchestrate` skill, section 1b) and its decision records before you write: a risk already there, or settled by a decision, is "known".
 
 For each risk:
 - **Where:** `file:line` (several if it spans files).
@@ -60,6 +62,10 @@ For each risk:
 - **What breaks and when:** now, or at a named step of growth from the roadmap ("at the second guest", "when the mobile app shares the database").
 - **What to do:** one sentence.
 - **Size:** XS (up to 10 lines), S (up to 100), M (up to 300), L (more), or "decision" when the first step is a choice, not code.
+- **Evidence:** `run` (shown by a test, a command or production data in the repo), `read` (read in the code) or `opinion`.
+- **When to act:** `now` (it breaks today), `at <roadmap step>` (it breaks at that step; do it right before), or `accept` (cheaper to live with; say why and what would change that).
+
+End the review with a table in the ledger's columns (`orchestrate` skill, `templates.md`), ready to paste: id (the next free ones in the ledger, not R1–R10 if those are taken), where, harm (P0–P3 by the finding card), evidence, decision (`now` → `now`, `at <step>` → `debt` with that step as revisit when, `accept` → `accepted: <reason>`), revisit when, source (this review and its date).
 
 Do not repeat known findings. Where a risk touches one, link it and write "known"; end the section with one line listing the known findings you skipped, each with its link.
 
