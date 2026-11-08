@@ -4,9 +4,11 @@
 Reads transcripts in ~/.claude/projects/*/*.jsonl (usage numbers only, never message text).
 No dependencies. Python 3.8+.
 
-  usage.py tokens [--session ID] [--since T] [--until T] [--json]
-  usage.py log --type TYPE --session ID --est LO HI [--effort E]   append estimate vs actual
-  usage.py estimate --type TYPE [--ctx TOKENS --steps LO-HI --model M]   range for a new task
+  usage.py tokens [--session ID | --self] [--project P] [--since T] [--until T] [--json]
+  usage.py days [--project P] [--since T] [--until T] [--json]     totals per local day
+  usage.py log --type TYPE --session ID --est LO HI [--effort E] [--size S|M|L|XL]   append estimate vs actual
+  usage.py review [--type TYPE]                 estimate against actual, inside / over / under
+  usage.py estimate --type TYPE [--size S|M|L|XL] [--model M] [--ctx TOKENS --steps LO-HI]   range for a new task
   usage.py calibrate PCT@TIME PCT@TIME          weighted tokens per 1% from two get_usage readings
   usage.py calibration                          show saved calibrations
 
@@ -62,12 +64,17 @@ def parse_time(s):
     return d if d.tzinfo else d.astimezone()
 
 
-def scan(session=None, since=None, until=None):
-    """-> {session_id: stats}. One entry per unique assistant message id (last copy wins)."""
+def messages(session=None, since=None, until=None, project=None):
+    """-> list of (session, project, model, ts, input, output, cache_read, cw5, cw1).
+
+    One entry per unique assistant message id (last copy wins). Only usage numbers are read."""
     msgs = {}
     root = os.environ.get("ORCHESTRATE_PROJECTS") or "~/.claude/projects"
     for f in glob.glob(os.path.join(os.path.expanduser(root), "*", "*.jsonl")):
+        proj = os.path.basename(os.path.dirname(f))
         if session and session not in os.path.basename(f):
+            continue
+        if project and project not in proj:
             continue
         if since and datetime.fromtimestamp(os.path.getmtime(f), timezone.utc) < since:
             continue
@@ -89,21 +96,36 @@ def scan(session=None, since=None, until=None):
                 cw1 = cc.get("ephemeral_1h_input_tokens", 0)
                 cw5 = cc.get("ephemeral_5m_input_tokens", u.get("cache_creation_input_tokens", 0) - cw1)
                 msgs[(sid_file, m.get("id") or d.get("uuid"))] = (
-                    d.get("sessionId") or sid_file, m["model"], ts,
+                    d.get("sessionId") or sid_file, proj, m["model"], ts,
                     u.get("input_tokens", 0), u.get("output_tokens", 0),
                     u.get("cache_read_input_tokens", 0), cw5, cw1)
+    return list(msgs.values())
+
+
+def group(rows, key):
+    """Sum message rows into {key(row): stats}."""
     out = {}
-    for sid, model, ts, i, o, cr, cw5, cw1 in msgs.values():
-        s = out.setdefault(sid, dict(session=sid, input=0, output=0, cache_read=0, cache_write=0,
-                                     messages=0, weighted=0.0, models={}, first=ts, last=ts, unpriced=False))
+    for r in rows:
+        sid, proj, model, ts, i, o, cr, cw5, cw1 = r
+        k = key(r)
+        s = out.setdefault(k, dict(key=k, session=sid, project=proj, input=0, output=0, cache_read=0,
+                                   cache_write=0, messages=0, weighted=0.0, models={}, sessions=set(),
+                                   first=ts, last=ts, unpriced=False))
         s["input"] += i; s["output"] += o; s["cache_read"] += cr; s["cache_write"] += cw5 + cw1
         s["messages"] += 1; s["weighted"] += weigh(model, i, o, cr, cw5, cw1)
         s["models"][model] = s["models"].get(model, 0) + 1
+        s["sessions"].add(sid)
         s["first"], s["last"] = min(s["first"], ts), max(s["last"], ts)
         s["unpriced"] |= price(model)[1]
     for s in out.values():
         s["model"] = max(s["models"], key=s["models"].get)
+        s["sessions"] = len(s["sessions"])
     return out
+
+
+def scan(session=None, since=None, until=None, project=None):
+    """-> {session_id: stats}."""
+    return group(messages(session, since, until, project), key=lambda r: r[0])
 
 
 def fmt(n):
@@ -124,17 +146,37 @@ def append(path, rec):
         fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
 
-def latest_cal():
-    c = read_jsonl(CAL)
+def latest_cal(window="weekly"):
+    c = [r for r in read_jsonl(CAL) if r.get("window", "weekly") == window]
     return c[-1] if c else None
 
 
+def own_session(a):
+    if getattr(a, "self", False):
+        sid = os.environ.get("CLAUDE_CODE_SESSION_ID")
+        if not sid:
+            sys.exit("--self: CLAUDE_CODE_SESSION_ID is not set here; pass --session <id>")
+        return sid
+    return a.session
+
+
+def dump(rows):
+    for s in rows:
+        s.update(first=s["first"].isoformat(), last=s["last"].isoformat())
+    print(json.dumps(rows, indent=1))
+
+
 def cmd_tokens(a):
-    rows = sorted(scan(a.session, a.since, a.until).values(), key=lambda s: -s["weighted"])
+    rows = sorted(scan(own_session(a), a.since, a.until, a.project).values(), key=lambda s: -s["weighted"])
     if a.json:
-        for s in rows:
-            s.update(first=s["first"].isoformat(), last=s["last"].isoformat())
-        print(json.dumps(rows, indent=1)); return
+        dump(rows); return
+    if getattr(a, "self", False) and rows:
+        s = rows[0]
+        mins = (s["last"] - s["first"]).total_seconds() / 60
+        print(f"tokens: in {fmt(s['input'])}, out {fmt(s['output'])}, cache read {fmt(s['cache_read'])}, "
+              f"cache write {fmt(s['cache_write'])}; weighted {fmt(s['weighted'])}; "
+              f"{s['messages']} messages over {mins:.0f} min; {s['model']}")
+        return
     print(f"{'session':36} {'msgs':>5} {'input':>7} {'output':>7} {'c.read':>8} {'c.write':>8} {'weighted':>9}  model")
     for s in rows[: a.top]:
         print(f"{s['session']:36} {s['messages']:5} {fmt(s['input']):>7} {fmt(s['output']):>7} "
@@ -144,6 +186,37 @@ def cmd_tokens(a):
     print(f"{len(rows)} sessions, total weighted {fmt(t)} (1 = one Sonnet 5.5 input token)")
 
 
+def cmd_days(a):
+    def day(r):
+        return r[3].astimezone().date().isoformat()
+    rows = sorted(group(messages(None, a.since, a.until, a.project), key=day).values(), key=lambda s: s["key"])
+    if a.json:
+        dump(rows); return
+    print(f"{'day':10} {'sess':>4} {'msgs':>5} {'input':>7} {'output':>7} {'c.read':>8} {'c.write':>8} {'weighted':>9}")
+    for s in rows:
+        print(f"{s['key']:10} {s['sessions']:4} {s['messages']:5} {fmt(s['input']):>7} {fmt(s['output']):>7} "
+              f"{fmt(s['cache_read']):>8} {fmt(s['cache_write']):>8} {fmt(s['weighted']):>9}")
+    t = sum(s["weighted"] for s in rows)
+    print(f"{len(rows)} days, total weighted {fmt(t)}")
+    c = latest_cal(a.window)
+    if c and rows:
+        print(f"  = {t / c['per_pct']:.0f}% of the limit at the {c['date']} calibration")
+
+
+def cmd_review(a):
+    rows = [r for r in read_jsonl(LOG) if not a.type or r.get("task_type") == a.type]
+    if not rows:
+        print("no estimate lines yet"); return
+    inside = 0
+    for r in rows:
+        lo, hi = r["estimate"]
+        mark = "inside" if lo <= r["actual"] <= hi else ("over" if r["actual"] > hi else "under")
+        inside += mark == "inside"
+        print(f"{r['ts'][:10]}  {r['task_type']:12} {r.get('size') or '-':3} {fmt(lo):>7}-{fmt(hi):<7} "
+              f"actual {fmt(r['actual']):>7}  {mark}")
+    print(f"{inside} of {len(rows)} inside the estimate")
+
+
 def cmd_log(a):
     found = scan(a.session, a.since, a.until)
     s = found.get(a.session) or next(iter(found.values()), None)
@@ -151,7 +224,7 @@ def cmd_log(a):
         sys.exit("no transcript found for that session")
     rec = dict(ts=datetime.now(timezone.utc).isoformat(timespec="seconds"), session=s["session"], task_type=a.type,
                model=s["model"], effort=a.effort, messages=s["messages"], weighted=round(s["weighted"]),
-               estimate=[a.est[0], a.est[1]], actual=round(s["weighted"]))
+               estimate=[a.est[0], a.est[1]], actual=round(s["weighted"]), size=a.size)
     append(LOG, rec)
     inside = "inside" if a.est[0] <= rec["actual"] <= a.est[1] else "OUTSIDE"
     print(f"logged: {a.type}, actual {fmt(rec['actual'])} vs estimate {fmt(a.est[0])}-{fmt(a.est[1])} ({inside})")
@@ -159,8 +232,9 @@ def cmd_log(a):
 
 def cmd_estimate(a):
     rows = [r for r in read_jsonl(LOG) if r.get("task_type") == a.type]
-    same = [r for r in rows if r.get("model") == a.model]
-    rows = same if len(same) >= MIN_LINES else rows
+    for field, want in (("size", a.size), ("model", a.model)):
+        same = [r for r in rows if want and r.get(field) == want]
+        rows = same if len(same) >= MIN_LINES else rows
     if len(rows) >= MIN_LINES:
         v = sorted(r["actual"] for r in rows)
         lo, hi = v[len(v) // 4], v[-1 - len(v) // 4]
@@ -175,12 +249,12 @@ def cmd_estimate(a):
         lo, hi = per * s_lo, per * s_hi
         src = f"too little history ({len(rows)} lines): context {fmt(a.ctx)} x {s_lo}-{s_hi} steps"
     print(f"estimate {fmt(lo)} - {fmt(hi)} weighted  [{src}]")
-    c = latest_cal()
+    c = latest_cal(a.window)
     if c:
         print(f"  = {lo / c['per_pct']:.1f} - {hi / c['per_pct']:.1f}% of the limit "
               f"(calibration {c['date']}: {fmt(c['per_pct'])} per 1%, window '{c.get('window', '?')}')")
     else:
-        print("  percent unknown: no calibration yet (run `calibrate`)")
+        print(f"  percent unknown: no '{a.window}' calibration yet (run `calibrate`)")
 
 
 def cmd_calibrate(a):
@@ -212,12 +286,21 @@ def main():
     sub = p.add_subparsers(dest="cmd", required=True)
     t = sub.add_parser("tokens"); t.add_argument("--session"); t.add_argument("--since", type=parse_time)
     t.add_argument("--until", type=parse_time); t.add_argument("--top", type=int, default=20); t.add_argument("--json", action="store_true")
+    t.add_argument("--project", help="substring of the ~/.claude/projects folder name")
+    t.add_argument("--self", action="store_true", help="this session (CLAUDE_CODE_SESSION_ID), one line for a receipt")
     t.set_defaults(f=cmd_tokens)
+    d = sub.add_parser("days"); d.add_argument("--since", type=parse_time); d.add_argument("--until", type=parse_time)
+    d.add_argument("--project"); d.add_argument("--json", action="store_true")
+    d.add_argument("--window", default="weekly"); d.set_defaults(f=cmd_days)
+    r = sub.add_parser("review"); r.add_argument("--type"); r.set_defaults(f=cmd_review)
     l = sub.add_parser("log"); l.add_argument("--type", required=True); l.add_argument("--session", required=True)
     l.add_argument("--est", type=float, nargs=2, required=True, metavar=("LO", "HI")); l.add_argument("--effort", default="")
+    l.add_argument("--size", choices=["S", "M", "L", "XL"])
     l.add_argument("--since", type=parse_time); l.add_argument("--until", type=parse_time); l.set_defaults(f=cmd_log)
     e = sub.add_parser("estimate"); e.add_argument("--type", required=True); e.add_argument("--ctx", type=int)
-    e.add_argument("--steps"); e.add_argument("--model"); e.set_defaults(f=cmd_estimate)
+    e.add_argument("--steps"); e.add_argument("--model"); e.add_argument("--size", choices=["S", "M", "L", "XL"])
+    e.add_argument("--window", default="weekly", help="which calibration to print percents with (weekly, 5h)")
+    e.set_defaults(f=cmd_estimate)
     c = sub.add_parser("calibrate"); c.add_argument("first"); c.add_argument("second")
     c.add_argument("--window", default="weekly"); c.set_defaults(f=cmd_calibrate)
     sub.add_parser("calibration").set_defaults(f=cmd_calibration)

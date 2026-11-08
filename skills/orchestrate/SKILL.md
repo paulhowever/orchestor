@@ -73,16 +73,25 @@ Name the model in the line that introduces each session, and say why when it is 
 
 ## 3a. Budget before you start
 
-Cost is mostly cached context re-read on every step, so it is about context size × steps, not about the model alone. `usage.py` next to this file (run `python3 <skill dir>/usage.py`; `--help` lists the commands) turns transcripts into one weighted figure per session and keeps the log and the calibration in `~/.claude/orchestrate/`.
+Cost is mostly cached context re-read on every step, so it is about context size × steps, not about the model alone. `usage.py` next to this file (run `python3 <skill dir>/usage.py`; `--help` lists the commands) reads only the usage numbers in `~/.claude/projects/*/*.jsonl`, never message text, and keeps the log and the calibration in `~/.claude/orchestrate/`. `tokens` gives one weighted figure per session, `days` gives totals per day, `--project` narrows both.
 
 Before a batch:
 1. Read `get_usage` (load it with ToolSearch if deferred): the weekly and 5-hour percents and when they reset, and your own context fill.
-2. Estimate each task as a **range**, never one number: `usage.py estimate --type <kind>` (from past sessions of that kind; with fewer than 3 it says so and you give `--ctx` and `--steps LO-HI`). It prints percents once a calibration exists.
-3. Show a table: task, model, effort, estimated range, against what is left until the reset. Pick model and effort by that budget (section 3): a cheaper tier or lower effort for routine work when the budget is tight.
-4. If the batch does not fit, say what to postpone and to when; the user decides.
-5. Put a stop line in each brief: "stop at about N messages or X% of the weekly limit and report how far you got". Prefer a new session over a long one once context passes 50–60%.
+2. Size each task (section 3b) and estimate it as a **range**, never one number: `usage.py estimate --type <kind> --size <S|M|L|XL>` (from past sessions of that kind; with fewer than 3 it says so and you give `--ctx` and `--steps LO-HI`). It prints percents once a calibration exists.
+3. Show a table before you start anything:
 
-After a batch, for each finished session: `usage.py log --type <kind> --session <id> --est LO HI --effort <e>` (estimate against actual). To learn the percent rate, take two `get_usage` readings at least 3% apart, with their times: `usage.py calibrate 91@<time> 94@<time>`. The rate is saved with its date and drifts, so redo it now and then.
+   | Task | Size | Model / effort | Estimate | % weekly | % 5-hour |
+   |---|---|---|---|---|---|
+
+   with a last line: left until the weekly reset, left until the 5-hour reset. Pick model and effort by that budget (section 3): a cheaper tier or lower effort for routine work when the budget is tight.
+4. If the batch does not fit, say what to postpone and to when; the user decides.
+5. Put a stop line in each brief: "Stop at about N messages or X% of the weekly limit, and report how far you got." Prefer a new session over a long one once context passes 50–60%.
+
+When a session or the whole queue hits a limit, stop the queue and tell the user when it resets. Do not switch the work to another provider or a model the user did not pick.
+
+After a batch, for each finished session: `usage.py log --type <kind> --size <S|M|L|XL> --session <id> --est LO HI --effort <e>`, then `usage.py review` to see estimates against actuals; say in the digest which kinds run over.
+
+Calibration: take two `get_usage` readings at least 3% apart, with their times, and run `usage.py calibrate 91@<time> 94@<time> --window weekly` (or `--window 5h`). The moment a window resets counts as a reading of 0%, so `0@<reset time>` and the current reading is a valid pair once the current one is 3% or more. The rate is saved with its date and drifts, so redo it now and then.
 
 Without `get_usage` (plain CLI), work in weighted tokens and say that percents are unknown. Without a calibration, say the same.
 

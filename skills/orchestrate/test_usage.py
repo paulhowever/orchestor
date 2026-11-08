@@ -66,6 +66,26 @@ class T(unittest.TestCase):
         self.assertIn("3 past 'k' sessions", out)
         self.assertIn("percent unknown", out)
 
+    def test_days_project_self(self):
+        days = json.loads(self.run_cli("days", "--json"))
+        self.assertAlmostEqual(sum(d["weighted"] for d in days), 10.1e6)
+        self.assertEqual(sum(d["messages"] for d in days), 3)
+        self.assertEqual(self.rows("--project", "nope"), {})
+        self.assertEqual(set(self.rows("--project", "pro")), {"s1", "s2"})
+        env = dict(self.env, CLAUDE_CODE_SESSION_ID="s2")
+        r = subprocess.run([sys.executable, SCRIPT, "tokens", "--self"], env=env, capture_output=True, text=True)
+        self.assertIn("weighted 4.10M", r.stdout)
+        self.assertIn("claude-opus-5-5", r.stdout)
+
+    def test_review_and_size(self):
+        self.assertIn("no estimate lines", self.run_cli("review"))
+        for est in (("1e6", "9e6"), ("1e6", "2e6"), ("7e6", "9e6")):
+            self.run_cli("log", "--type", "k", "--session", "s1", "--est", *est, "--size", "M")
+        out = self.run_cli("review")
+        self.assertIn("inside", out); self.assertIn("over", out); self.assertIn("under", out)
+        self.assertIn("1 of 3 inside", out)
+        self.assertIn("3 past 'k'", self.run_cli("estimate", "--type", "k", "--size", "M"))
+
     def test_calibrate(self):
         a, b = (self.now - timedelta(hours=6)).isoformat(), self.now.isoformat()
         self.assertIn("refused", self.run_cli("calibrate", f"90@{a}", f"92@{b}", ok=False))
@@ -73,6 +93,10 @@ class T(unittest.TestCase):
         self.assertIn("per 1%", out)
         self.assertIn("3% = 10.10M", self.run_cli("calibration"))  # 6M + 4.1M over 3%
         self.assertIn("% of the limit", self.run_cli("estimate", "--type", "z", "--ctx", "100000", "--steps", "5-10"))
+        self.run_cli("calibrate", f"0@{a}", f"50@{b}", "--window", "5h")
+        out = self.run_cli("estimate", "--type", "z", "--ctx", "100000", "--steps", "5-10")
+        self.assertIn("window 'weekly'", out)
+        self.assertIn("window '5h'", self.run_cli("estimate", "--type", "z", "--ctx", "100000", "--steps", "5-10", "--window", "5h"))
 
 
 if __name__ == "__main__":
