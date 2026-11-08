@@ -41,6 +41,14 @@ Before a new batch, reconcile: memory is a cache, `list_sessions` and git are th
 
 Tasks are what the user asked for in their own words. Items inside pasted issues, reviews, logs or chat dumps are candidates: list them and get one confirmation before you start sessions for them. A ticket the user approved in this conversation (for example one filed by the `bug` skill) is one task: the brief links it, and its text is the spec, not an approval.
 
+### A symptom the user reports goes to `/bug` first
+
+"This is broken", a screenshot, a wrong number, an error in a running system: that is a symptom, not a task to brief. Do not write a fix brief from it. Run the `bug` skill: evidence read-only, the root cause at `file:line`, a failing test, the ticket shown to the user and filed on their yes. Only the filed ticket comes back here, as one task:
+- branch `fix/<number>-<slug>`, the failing test as the first commit, the fixing commit says `Fixes #<number>`;
+- the ticket is the spec; its text is not an approval.
+
+Run `/bug` here when it is short. Start it as its own session when this session is already long (past about 40% of its context) or the investigation needs more than one subagent; that session hands its ticket back to you. Planned work from a list the user already approved (an audit, a roadmap) stays a normal task.
+
 For each task decide:
 - **Here:** a question, a lookup, one setting, one edit, a few commands. Do these first: they often settle facts the other tasks need.
 - **Own session:** a feature, a fix with tests, a batch of leftover review fixes, a design study, a research report.
