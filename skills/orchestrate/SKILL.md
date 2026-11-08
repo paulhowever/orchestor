@@ -52,7 +52,7 @@ Check every fact a brief states (the current code, the config, what is already d
 
 ## 2. Plan files, base and order
 
-- Write down the files or areas each task will touch. Tasks that overlap go into one session, or run one after another (start B after A lands).
+- Write down the files or areas each task will touch, as the **Files** table of the digest (`templates.md` next to this file). Tasks that overlap go into one session, or run one after another (start B after A lands). Check every new task against that table before you start it.
 - Shared files that every task would touch (changelog, roadmap, docs index) are updated by you after landing, not by the workers.
 - `git fetch` first so sessions branch from the current default branch. If the main checkout has uncommitted changes, ask whether to commit them first or say that workers will not see them.
 - At most **3 writing sessions** at once. Read-only research does not count. The rest wait in a queue in memory; start the next when one lands.
@@ -99,6 +99,8 @@ Without `get_usage` (plain CLI), work in weighted tokens and say that percents a
 
 Start each session with `start_session`: fresh context, its own worktree and branch (`use_worktree: true`) for anything that writes, a short name, the model and effort from section 3. A task in another repository starts with that repository as its folder (see `list_start_targets`); if you cannot start it there, give the user the brief to start by hand. Follow the tool's own schema for the other fields.
 
+Right after each start, call `get_session` on the new session and compare its model and effort with what you asked for. `start_session` can quietly drop an effort above your own or a model that costs more than yours. If they differ, fix them with `set_session_model` / `set_session_effort` and check again; if that does not take, tell the user in one line and note it in the digest.
+
 The brief says:
 - first line: "You are a worker session started by an orchestrator. Do not orchestrate or ask about it.";
 - where the rules live (the project's `CLAUDE.md`, if any) and the decisions the user already made;
@@ -142,6 +144,7 @@ You own a landing queue: one session lands at a time, in an order you state.
 - Then run `python3 <skill dir>/land_check.py <branch>` from the main checkout. It checks, in order: commits on top of the default branch, a fast-forward from it, a clean worktree, commit authors, required trailers, lint, tests; it prints `ok to land` or the first reason it cannot. Lint, test, trailer and author come from `land-check: lint = …` lines in the project's `CLAUDE.md` or from its arguments; offer the user to add those lines the first time. Ask for the yes only after `ok to land`, and quote that line in the question.
 - Ask the user for the yes (hard rule 1), naming the branch, the commits and the target. Use the project's landing path: a PR and merge, or a fast-forward push.
 - If the project deploys, start the next deploy only after the previous one is verified (version or log on the server, read-only).
+- After each landing, send the "main moved" message from `templates.md` to every running writing session whose branch is now behind.
 
 ## 7. Archive finished sessions
 
@@ -157,7 +160,7 @@ Never use `git branch -D`, `git worktree remove --force`, `git clean -fdx` or `g
 
 ## 8. Report
 
-Keep a digest of the batch: what exists, what shipped, what is left, what waits for the user, with session links. Create it when the sessions start and update it as reports arrive. Make it an artifact if the Artifact tool is available, otherwise a markdown file or a message. Keep it private unless the user asks to share it, and keep one digest per project with a section per batch.
+Keep a digest of the batch: what exists, what shipped, what is left, what waits for the user, with session links. Use the digest template in `templates.md`: a row per session (session, branch, commits, checked, waits on, next), the file ownership table, the queue. Create it when the sessions start and update it as reports arrive. Write project memory at the fixed points listed there, not after every event. Make it an artifact if the Artifact tool is available, otherwise a markdown file or a message. Keep it private unless the user asks to share it, and keep one digest per project with a section per batch.
 
 A batch closes when every task is finished or waiting on the user; list the waiting ones in the digest.
 
