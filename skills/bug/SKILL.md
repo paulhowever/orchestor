@@ -69,6 +69,8 @@ Invoke `/orchestrate` with one task: "fix <ticket link>". This counts as the use
 
 Without `/orchestrate` or session tools, do the fix here in a worktree in the same order, and still land only on the user's yes.
 
+If you are a session an orchestrator started for this investigation, do not invoke `/orchestrate`: end with the filed ticket's link and the fields above in your report, and the orchestrator starts the fix session.
+
 ## 6. Close the loop
 
 After the fix lands (on the user's yes, per `/orchestrate`):
