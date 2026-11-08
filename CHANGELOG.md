@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0 — unreleased
+## 0.5.0 — 2026-11-08
 
 - `orchestrate`, budget (3a): an estimate table before a batch (task, size, model and effort, range, % weekly, % 5-hour, what is left until each reset); when a session or the queue hits a limit, the queue stops until the reset and the work never moves to another provider; after a batch, `usage.py review` compares estimates with actuals. A window's reset counts as a 0% reading for calibration.
 - `usage.py`: `days` (totals per day), `--project`, `tokens --self` (one line for a receipt, from `CLAUDE_CODE_SESSION_ID`), `review`, `--size` on `log` and `estimate`, calibrations kept per window (`--window weekly|5h`).
