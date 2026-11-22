@@ -35,7 +35,7 @@ These hold for you and for every session you start. Put rules 1–3 in every bri
 - No → do everything in this session and stop reading this skill.
 - If your brief or first message says you are a worker session started by an orchestrator, never orchestrate.
 
-Before a new batch, reconcile: memory is a cache, `list_sessions` and git are the truth. Fix memory where they disagree (sessions archived or merged by hand, finished queue items).
+Before a new batch, and on the first turn after a compaction, read the state note (section 8a), then reconcile: memory is a cache, `list_sessions` and git are the truth. Fix memory where they disagree (sessions archived or merged by hand, finished queue items).
 
 ## 1. Split the message
 
@@ -261,16 +261,35 @@ Never use `git branch -D`, `git worktree remove --force`, `git clean -fdx` or `g
 
 ## 8. Report
 
-Keep a digest of the batch: what exists, what shipped, what is left, what waits for the user, with session links. Use the digest template in `templates.md`: a row per session (session, branch, commits, checked, waits on, next), the file ownership table, the queue, the mode (features, or a freeze with its exit and date), the split of features / fixes / debt, and the ledger's path. Create it when the sessions start and update it as reports arrive. Write project memory at the fixed points listed there, not after every event. Make it an artifact if the Artifact tool is available, otherwise a markdown file or a message. Keep it private unless the user asks to share it, and keep one digest per project with a section per batch.
+Keep a digest of the batch: what exists, what shipped, what is left, what waits for the user, with session links. Use the digest template in `templates.md`: a row per session (session, branch, commits, checked, waits on, next), the file ownership table, the queue, the mode (features, or a freeze with its exit and date), the split of features / fixes / debt, and the ledger's path. Create it when the sessions start and update it as reports arrive. Write project memory at the fixed points listed there, not after every event; the state note (section 8a) is rewritten at the same points. Make it an artifact if the Artifact tool is available, otherwise a markdown file or a message. Keep it private unless the user asks to share it, and keep one digest per project with a section per batch.
 
 A batch closes when every task is finished or waiting on the user; list the waiting ones in the digest.
 
 Optional: if the user's rules name a place to log finished work (a knowledge base, a changelog, a project page), offer to write the result there.
 
+## 8a. State note: what survives a compaction
+
+The orchestrator's context is cut without warning: an auto-compaction, `/compact`, `clear_session`, a closed window. A summary written by the harness keeps a list of tool names and user messages, not where the batch stands. So the orchestrator keeps one **state note** per project and never lets it fall behind.
+
+What it is: one file in project memory (`orchestrate-state.md`, rewritten whole every time, never appended), about 30 lines, in this order, using the template in `templates.md`:
+1. the batch, its date and one-line goal;
+2. **done**: landed tasks with branch, sha, deployed or not, archived or not;
+3. **running**: every open session with name, id, task and what it waits on;
+4. **waits on the user**: each approval or question, with the session link;
+5. **queue**: what has not started and why;
+6. **next step**: the single next action, written for a stranger who has no history ("check the receipt of `fix-32` against git, then ask for the yes to land it");
+7. where the digest and the ledger live.
+
+Rules:
+- Rewrite it at every memory point in `templates.md` (batch start, session started, report received, landed, archived): they are the moments the state changed, so the note is never more than one event stale.
+- Before any cut you can see coming, rewrite it first and quote it in your reply: when the user asks to compact or clear, when you offer `clear_session` (section 9), when the harness says the context is long, and before any turn that will read many files or reports.
+- After a cut (the turn begins with a summary of a prior conversation, or the session feels empty): read the state note before anything else, reconcile it with `list_sessions` and git (section 0), and answer with a short "where we are" (done / running / waits on you / next). The note and git win over the summary; redo nothing the summary lists as done until git says it is not.
+- It is state, not a log: no history, no reasoning, no secrets (hard rule 5). The digest holds the detail; the note holds what a fresh orchestrator needs to pick up the next step.
+
 ## 9. Keep the orchestrator cheap
 
 A long orchestrator session costs mostly cached context. When a batch is closed and nothing waits on you:
-1. List in your reply every open session (with its id), unmerged branch, pending approval, queue item and the digest location, and make sure memory holds all of them.
+1. Rewrite the state note (section 8a) and quote it in your reply: every open session (with its id), unmerged branch, pending approval, queue item, the next step and the digest location.
 2. Offer to clear this session with `clear_session` (`"self"`): the clear runs after the turn, and the next batch starts from memory.
 
 Never clear on your own initiative, or while a session still owes a report or waits on an approval you are tracking.

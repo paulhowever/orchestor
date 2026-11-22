@@ -102,3 +102,32 @@ Memory is the orchestrator's cache between sessions. Update it at these points, 
 - archived: name and reason; remove its open lines.
 
 Rules the user states for future batches go in when they are said (section 5), not at these points.
+
+At each of these points the **state note** (`orchestrate-state.md` in project memory, section 8a) is rewritten whole, so it is never more than one event behind.
+
+## State note
+
+One per project, rewritten whole at every memory point and before any compaction or clear; about 30 lines; no history, no reasoning, no secrets.
+
+```
+# Orchestrate state: <project>  (<date time>)
+
+Batch <date>: <one-line goal>. Digest: <where>. Ledger: <path>.
+
+## Done
+- <task>: landed <sha> on <branch> <date>; deployed <yes/no/when>; archived <yes/no>
+
+## Running
+- [<name>](<link>) <id>: <task>; waits on <nothing | user: what | session | limit until when>
+
+## Waits on the user
+- <what exactly, in one line>: [<session>](<link>)
+
+## Queue
+1. <task>: waits for <what>
+
+## Next step
+<one action for an orchestrator with no history, e.g. "check fix-32's receipt against git (branch fix/32 @ sha, 2 commits), then ask for the yes to fast-forward main">
+```
+
+After a compaction, read this first, reconcile with `list_sessions` and git, then answer "where we are" in four lines: done / running / waits on you / next.

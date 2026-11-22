@@ -152,7 +152,7 @@ At most three that write code. Read-only research doesn't count. The rest wait i
 It archives only after checking the session's worktree: nothing uncommitted, nothing stashed, every commit reachable from the default branch. It never cleans up with `git branch -D`, `git clean -fdx`, `reset --hard` or forced worktree removal, and asks before archiving anything.
 
 **Does it remember between sessions?**
-It keeps the queue and per-project answers in Claude Code's project memory, and treats memory as a cache: before each batch it reconciles with the live session list and git. When a batch is closed, it can offer to clear its own session and pick up from memory next time.
+It keeps the queue and per-project answers in Claude Code's project memory, and treats memory as a cache: before each batch it reconciles with the live session list and git. When a batch is closed, it can offer to clear its own session and pick up from memory next time. A state note in memory (done, running sessions, what waits on you, queue, next step) is rewritten at every change and before any compaction, so a cut context never loses where the batch stands.
 
 **My message is just one task.**
 Then it's not a job for `/orchestrate`; Claude simply does it. The exception is a bug that came through `/bug`: once you approve its ticket, the fix gets its own session.
@@ -168,7 +168,7 @@ Then it's not a job for `/orchestrate`; Claude simply does it. The exception is 
 - [`docs/launch/`](docs/launch): launch post drafts
 - [`skills/orchestrate/usage.py`](skills/orchestrate/usage.py): optional helper for the budget step (tokens per session from your transcripts, estimate-against-actual log, calibration to limit percents); tests in `test_usage.py`
 - [`skills/orchestrate/land_check.py`](skills/orchestrate/land_check.py): the check before landing or archiving a branch; tests in `test_land_check.py`
-- [`skills/orchestrate/templates.md`](skills/orchestrate/templates.md): digest, file ownership, the "main moved" message, when to write memory
+- [`skills/orchestrate/templates.md`](skills/orchestrate/templates.md): digest, file ownership, the "main moved" message, when to write memory, the state note
 - [`CLAUDE.md.snippet`](CLAUDE.md.snippet): optional rule to ask once per project whether to orchestrate
 - [`docs/brainstorm.md`](docs/brainstorm.md): how v0.1.0 was reviewed and what changed
 - [`docs/market.md`](docs/market.md): alternatives and positioning (Russian)

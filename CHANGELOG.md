@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1 — 2026-11-22
+
+- `orchestrate`, new section 8a: a **state note** per project (`orchestrate-state.md` in project memory, rewritten whole, about 30 lines: batch, done, running sessions with ids, what waits on the user, queue, the one next step, where the digest and ledger live). It is rewritten at every memory point and before any compaction or clear the orchestrator can see coming, and quoted in the reply; on the first turn after a compaction the orchestrator reads it, reconciles with `list_sessions` and git, and answers "where we are" before doing anything else. Section 9 step 1 and section 0 point to it. Template in `templates.md`.
+- Hard rules 1–6 are unchanged.
+
 ## 0.6.0 — 2026-11-08
 
 Reviews that end. Plan and sources: `docs/finite-review.md` (Russian).
