@@ -4,7 +4,7 @@ Fill these in; keep the shape so the user can read a batch at a glance. Secrets 
 
 ## Digest
 
-One digest per project, a section per batch, newest batch first.
+One digest per project, a section per batch, newest batch first. Make it an artifact if the Artifact tool is available, otherwise a markdown file or a message. Keep it private unless the user asks to share it.
 
 ```
 ## Batch <date>: <one-line goal>
@@ -54,22 +54,24 @@ On a conflict in a file you do not own (see your brief), stop and report instead
 
 ## Reviewer brief
 
-For the one fresh-context review before landing (SKILL section 6) and, with a lens and a budget instead of a diff, for an audit (section 1b).
+For the one fresh-context review before landing (SKILL.md section 6) and, with a lens and a budget instead of a diff, for an audit (section 1b). The reviewer is read-only: its output is cards and a verdict. Asking a reviewer for corrections makes it reject more correct code (arXiv 2603.00539), so the brief asks for none.
 
 ```
 You review <branch> against <default branch>: the diff and the code it directly calls or is called by.
-Input: the diff (git diff <base>...<branch>), the findings ledger <path or "none">, the decision records <path or "none">.
+You are read-only: run and read, change nothing.
+Input: the diff (git diff <base>...<branch>), the acceptance criteria <from the worker's brief>, the findings ledger <path or "none">, the decision records <path or "none">.
 Not your input: the worker's reasoning or report.
 
-Look for, in this order: wrong behaviour for a person, lost or leaked data, security, a broken contract
+First check each acceptance criterion: holds | does not hold | not checked, with the evidence. One that does not hold is a finding.
+Then look for, in this order: wrong behaviour for a person, lost or leaked data, security, a broken contract
 (API, schema, a rule in CLAUDE.md), a regression in something that worked, a significant structural risk this diff adds.
 
 For each finding give a card: where (file:line), scenario (input or state → wrong outcome),
-evidence (run: a command or test you ran, with its output | read | opinion), harm P0–P3, the fix in one line.
+evidence (run: a command or test you ran, with its output | read | opinion), harm P0–P3.
 A finding without run evidence is P2 at most, unless it is security or data loss.
 A finding already in the ledger or settled by a decision record: write "known <id>", nothing more.
 
-Do not propose a global refactor or an alternative design. Do not count taste as a defect.
+Do not propose fixes, a global refactor or an alternative design. Do not count taste as a defect.
 End with one verdict line: "can land: no P0/P1" or "cannot land: <ids of P0/P1>".
 "No P0/P1" is a normal outcome; do not look for something to say.
 ```
@@ -118,7 +120,7 @@ Batch <date>: <one-line goal>. Digest: <where>. Ledger: <path>.
 - <task>: landed <sha> on <branch> <date>; deployed <yes/no/when>; archived <yes/no>
 
 ## Running
-- [<name>](<link>) <id>: <task>; waits on <nothing | user: what | session | limit until when>
+- [<name>](<link>) <id>: <task>, <branch, if unmerged>; waits on <nothing | user: what | session | limit until when>
 
 ## Waits on the user
 - <what exactly, in one line>: [<session>](<link>)
