@@ -24,8 +24,16 @@ Commands and trailers come from the arguments, or else from lines in the project
   land-check: author = me@example.com
 Without a lint or test command the step is skipped and the result says so.
 Lint and tests run with `sh -c` in the worktree; the script itself never commits, pushes or deletes.
+
+After "ok to land" it appends a landing record (repo, branch, base, head and base shas, time) to
+$ORCHESTRATE_HOME/landings.jsonl (default ~/.claude/orchestrate), which the plugin's push guard reads.
+After "ok to land" or "ok to archive" it runs `usage.py sync --quiet` from its own directory.
+Both are best effort: a failure there never changes the output or the exit code.
 """
-import argparse, os, re, subprocess, sys
+import argparse, json, os, re, subprocess, sys
+from datetime import datetime, timezone
+
+SYNC_TIMEOUT = 30   # seconds
 
 
 def git(repo, *a, ok=False):
@@ -65,6 +73,50 @@ def worktree_of(repo, branch):
 def default_base(repo):
     head = git(repo, "symbolic-ref", "--short", "refs/remotes/origin/HEAD", ok=True)
     return head.split("/", 1)[1] if head else "main"
+
+
+def landings_file():
+    home = os.environ.get("ORCHESTRATE_HOME") or os.path.expanduser("~/.claude/orchestrate")
+    return os.path.join(home, "landings.jsonl")
+
+
+def repo_id(repo):
+    """The same for the main checkout and every worktree of it."""
+    return os.path.realpath(os.path.join(repo, git(repo, "rev-parse", "--git-common-dir")))
+
+
+def tip(repo, ref):
+    return git(repo, "rev-parse", "--verify", "-q", ref + "^{commit}", ok=True)
+
+
+def record_landing(repo, branch, base, head, base_sha):
+    """Best effort. `refs` is where the default branch stood, so that a later move of it can be seen."""
+    try:
+        if (tip(repo, f"refs/heads/{branch}"), tip(repo, base)) != (head, base_sha):
+            raise RuntimeError(f"{branch} or {base} moved during the check; run it again")
+        refs = {}
+        remotes = (git(repo, "remote", ok=True) or "").split()
+        for ref in [f"refs/heads/{default_base(repo)}"] + [f"refs/remotes/{r}/{default_base(repo)}" for r in remotes]:
+            if tip(repo, ref):
+                refs[ref] = tip(repo, ref)
+        line = json.dumps({"repo": repo_id(repo), "branch": branch, "base": base, "head": head, "base_sha": base_sha,
+                           "refs": refs, "time": datetime.now(timezone.utc).isoformat(timespec="seconds")})
+        os.makedirs(os.path.dirname(landings_file()), exist_ok=True)
+        with open(landings_file(), "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception as e:
+        print(f"land_check: landing record not saved: {e}", file=sys.stderr)
+
+
+def sync_usage():
+    """Best effort: an older usage.py without `sync`, an error or a timeout is not our problem to report."""
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "usage.py")
+    try:
+        if os.path.exists(script):
+            subprocess.run([sys.executable, script, "sync", "--quiet"], timeout=SYNC_TIMEOUT, stdin=subprocess.DEVNULL,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
 
 
 def run(cmd, cwd):
@@ -149,6 +201,7 @@ def main():
             print(f"no: branch {a.branch} not found"); sys.exit(1)
         wt = a.dir or worktree_of(repo, a.branch)
         notes = []
+        head_sha, base_sha = tip(repo, f"refs/heads/{a.branch}"), tip(repo, base)
         why = (check_archive if a.archive else check_land)(a, repo, base, wt, notes)
     except RuntimeError as e:
         print(f"no: {e}"); sys.exit(1)
@@ -159,6 +212,10 @@ def main():
     print(f"ok to {'archive' if a.archive else 'land'}: {a.branch} at {head}, {n} commit(s) on {base}")
     for x in notes:
         print("  " + x)
+    sys.stdout.flush()
+    if not a.archive:
+        record_landing(repo, a.branch, base, head_sha, base_sha)
+    sync_usage()
 
 
 if __name__ == "__main__":
