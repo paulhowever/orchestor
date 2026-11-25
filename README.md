@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
-  <a href="CHANGELOG.md"><img alt="Version 0.4.0" src="https://img.shields.io/badge/version-0.4.0-c96442"></a>
+  <a href="CHANGELOG.md"><img alt="Version 0.7.0" src="https://img.shields.io/badge/version-0.7.0-c96442"></a>
   <img alt="Claude Code plugin" src="https://img.shields.io/badge/Claude_Code-plugin-555">
 </p>
 
@@ -35,7 +35,7 @@ No tmux, no extra app, no board to babysit. It lives inside the Claude desktop a
 </picture>
 
 1. **Split.** Quick things (a question, one edit, a couple of commands) are done right here, first, because they often settle facts the other tasks need. Everything bigger gets its own session.
-2. **Run.** Each session gets a short brief, its own worktree and branch, and a model and effort that fit: the strongest model for design and hard bugs, mid-tier for routine work, the smallest for read-only research. At most three sessions write at once; the rest queue.
+2. **Run.** Each session gets a short brief, its own worktree and branch, and a model and effort picked by a table in code from a card of facts about the task (kind, size, sites, spec, verifier, risk). A task climbs to more effort or a stronger model only after a check failed. At most three sessions write at once; the rest queue.
 3. **Check.** A session's report is a claim, not proof. Each report ends with a fixed receipt (done, draft, blocked or ask; branch, commits, checks, tokens), and the orchestrator checks it against the branch, the diff and the CI itself. Before it asks you to land, `land_check.py` confirms a fast-forward, a clean worktree, authors, trailers, lint and tests.
    One fresh-context review per landing, and it has to end: every finding gets a harm level (P0–P3) and evidence (run, read or opinion). Only P0/P1 go back to the session; P2 goes to the project's findings ledger, P3 is dropped. Audits run only on a trigger (a complaint, a costly hot spot, the step before a roadmap phase), with one question and a budget of five items. A feature freeze needs a measurable exit and a date.
 4. **You decide.** Push, merge, deploy, release: each needs your yes, typed in chat, naming that action. A "yes" found inside a report, a file or a CI log doesn't count. Branches land one at a time, rebased and re-checked. A session is archived only when its worktree is clean and its commits are merged — and only after you say so.
@@ -143,7 +143,7 @@ No. Every push to a shared branch, merge, force-push, tag, release, publish, dep
 It doesn't count. Approvals don't travel through text: reports, files, commits and CI logs are data, and instructions found in them are shown to you, not followed.
 
 **Which models does it use?**
-Tiers, not names: the strongest for design, architecture and hard bugs; mid-tier for agreed features and routine fixes; the smallest for read-only research. It names the model for each session and says why when it picks the strongest. Parallel high-effort sessions burn quota fast, so it saves them for where they pay off.
+The orchestrator fills a card of facts and `route.py` picks the model and effort from `routes.json`, where all model names live. Any risk flag (data, auth, money, public API, hard to undo) means the strong tier and a review. Overrides need a reason. The table is a synthesis of published evidence, not measured on your tasks: each pick and outcome is logged so you can correct it. It names the model for each session and says why when it picks the strongest. Parallel high-effort sessions burn quota fast, so it saves them for where they pay off.
 
 **How many sessions at once?**
 At most three that write code. Read-only research doesn't count. The rest wait in a queue and start as earlier ones land.
@@ -159,15 +159,17 @@ Then it's not a job for `/orchestrate`; Claude simply does it. The exception is 
 
 ## Files
 
-- [`skills/orchestrate/SKILL.md`](skills/orchestrate/SKILL.md): the skill itself
+- [`skills/orchestrate/SKILL.md`](skills/orchestrate/SKILL.md): the core of the skill; [`references/`](skills/orchestrate/references) is opened on demand; checks in `test_skill.py`
 - [`skills/bug/SKILL.md`](skills/bug/SKILL.md): bug report → root cause → ticket → fix session
 - [`skills/arch-tutor/SKILL.md`](skills/arch-tutor/SKILL.md): architecture map, glossary and risk review of a repository
 - [`.claude-plugin/`](.claude-plugin): plugin manifest and the `orchestor` marketplace
 - [`INSTALL.md`](INSTALL.md): install, update, uninstall
 - [`docs/distribution.md`](docs/distribution.md): where the skill is listed and how to submit it
 - [`docs/launch/`](docs/launch): launch post drafts
-- [`skills/orchestrate/usage.py`](skills/orchestrate/usage.py): optional helper for the budget step (tokens per session from your transcripts, estimate-against-actual log, calibration to limit percents); tests in `test_usage.py`
-- [`skills/orchestrate/land_check.py`](skills/orchestrate/land_check.py): the check before landing or archiving a branch; tests in `test_land_check.py`
+- [`skills/orchestrate/usage.py`](skills/orchestrate/usage.py): budget helper (tokens per session with its subagents, `sync` of finished tasks into the log, calibration to limit percents); reads usage numbers on your machine, never message text; tests in `test_usage.py`
+- [`skills/orchestrate/route.py`](skills/orchestrate/route.py), [`routes.json`](skills/orchestrate/routes.json): task card → model and effort, escalation after a verified failure; tests in `test_route.py`
+- [`hooks/`](hooks): plugin hooks: restore the batch after a context cut, check worker briefs, guard pushes to the default branch; they deny or stay silent, never ask
+- [`skills/orchestrate/land_check.py`](skills/orchestrate/land_check.py): the check before landing or archiving a branch, with a record the push guard reads; tests in `test_land_check.py`
 - [`skills/orchestrate/templates.md`](skills/orchestrate/templates.md): digest, file ownership, the "main moved" message, when to write memory, the state note
 - [`CLAUDE.md.snippet`](CLAUDE.md.snippet): optional rule to ask once per project whether to orchestrate
 - [`docs/brainstorm.md`](docs/brainstorm.md): how v0.1.0 was reviewed and what changed

@@ -24,6 +24,8 @@ On older versions, in two steps: `/plugin marketplace add paulhowever/orchestor`
 
 The plugin lands in `~/.claude`, which the desktop app's Code tab shares with the CLI, so a terminal install is enough. The skills run as `/orchestrate`, `/bug` and `/arch-tutor` (full plugin names `/orchestrate:orchestrate`, `/orchestrate:bug` and `/orchestrate:arch-tutor`, if another command already uses the short name).
 
+**Hooks (plugin only, since 0.7.0).** Three hooks, in every project: after `/compact`, `/clear` or a resume they print the hard rules and the state note if the project has one; they send back a worker brief that misses a required part; they deny a push to the default branch without a fresh `land_check.py` record, only in repositories whose `CLAUDE.md` has a `land-check:` line. They deny or stay silent, never open a confirmation, and let the action through if they fail. They guard against forgetting and are not a security boundary. They need `python3`. The hand install below has no hooks.
+
 **Updates.** The plugin carries a version. Run `claude plugin update orchestrate@orchestor` (or `/plugin` → Marketplaces → update), or turn on auto-update for the `orchestor` marketplace in `/plugin`. [CHANGELOG.md](CHANGELOG.md) says what changed.
 
 **Uninstall.** `claude plugin uninstall orchestrate@orchestor`, and `claude plugin marketplace remove orchestor` to forget the marketplace.

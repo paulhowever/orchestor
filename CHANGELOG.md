@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.0 — 2026-11-25
+
+Facts instead of guesses: a task card picks the model, the log fills itself, and the rules that matter late survive a compaction.
+
+- New `route.py` and `routes.json`: a card of facts (kind, size, sites, spec, verifier, risk) picks model and effort from a table in code; any risk flag means the strong tier at high and a review; XL is refused; overrides need a reason. A task climbs (`fail`) only with evidence of a failed check: one informed retry, then at most two rungs, then split or ask. Each pick, start, climb and outcome goes to `routes.jsonl`. No router model: see [verified escalation](https://arxiv.org/abs/2610.34491) and [routers lack information](https://arxiv.org/abs/2606.22902). The table is an untested synthesis to review on each model release.
+- `usage.py`: finds sessions by the desktop app's id as well as the transcript id (the old `log` could not), counts subagent and workflow transcripts, counts copied messages of forks and resumes once, prices as of 2026-11-25. New `sync` writes a row per finished task by itself. **Totals go up and old calibrations warn: run `usage.py calibrate` once per window.**
+- New plugin hooks (`hooks/`): after a context cut they restore the hard rules and the state note ([why](https://arxiv.org/abs/2606.22528)); they check worker briefs; they guard pushes to the default branch in repositories that opted in with a `land-check:` line. None of them asks, all fail open. Plugin install only. Not yet confirmed in the desktop app: that it honours a deny on `start_session`.
+- `land_check.py` records a successful check for the push guard and runs `usage.py sync`; its output and exit codes are unchanged.
+- `SKILL.md` is a 20k-character core instead of 29.6k: hard rules, after a cut, landing and archive come first, because only the first 5,000 tokens of a skill return after a compaction. The rest is in `references/`, opened on demand. Several ready branches land as a chain with one yes that names every commit.
+- The reviewer brief no longer asks for fixes, which [raises false rejections](https://arxiv.org/abs/2603.00539).
+- `docs/quality/findings.md`: this project's findings ledger.
+- Hard rules 1–6 are unchanged.
+
 ## 0.6.1 — 2026-11-22
 
 - `orchestrate`, new section 8a: a **state note** per project (`orchestrate-state.md` in project memory, rewritten whole, about 30 lines: batch, done, running sessions with ids, what waits on the user, queue, the one next step, where the digest and ledger live). It is rewritten at every memory point and before any compaction or clear the orchestrator can see coming, and quoted in the reply; on the first turn after a compaction the orchestrator reads it, reconciles with `list_sessions` and git, and answers "where we are" before doing anything else. Section 9 step 1 and section 0 point to it. Template in `templates.md`.
