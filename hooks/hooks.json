@@ -1,0 +1,27 @@
+{
+  "description": "orchestrate: restore the batch after a context cut, check worker briefs, guard pushes to the default branch in repositories that opted in. Every hook fails open and none of them asks.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "compact|clear|resume",
+        "hooks": [
+          {"type": "command", "command": "python3", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/session_start.py"], "timeout": 10}
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "mcp__ccd_session__start_session",
+        "hooks": [
+          {"type": "command", "command": "python3", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/worker_brief.py"], "timeout": 5}
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {"type": "command", "if": "Bash(git *)", "command": "python3", "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/push_guard.py"], "timeout": 5}
+        ]
+      }
+    ]
+  }
+}
