@@ -4,7 +4,8 @@ Run: python3 skills/orchestrate/test_skill.py. After a compaction Claude Code re
 tokens of a skill, so the rules needed late in a batch must sit at the start of SKILL.md. The other checks keep
 the text in step with the scripts and hooks it names. Nothing here touches the real ~/.claude.
 """
-import glob, hashlib, json, os, re, subprocess, sys, tempfile, unittest
+import glob, hashlib, json, os, re, shlex, subprocess, sys, tempfile, unittest
+from datetime import datetime, timedelta, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -62,6 +63,14 @@ class Core(unittest.TestCase):
         rules = hooklib.hard_rules()
         self.assertEqual(len(rules), 6)
         self.assertEqual(hashlib.sha256("\n".join(rules).encode()).hexdigest()[:16], RULES_SHA)
+
+
+    def test_every_batch_reaches_the_freeze_and_the_debt_share(self):
+        """Rules of every batch must fire for a batch of plain features, so the core states them and their moment."""
+        text = section(SKILL, "Decide whether to orchestrate")
+        self.assertRegex(text, r"(?i)at (the start of )?(each|every) batch")
+        for part in ("freeze", "exit", "date", "debt", "25%", "three batches", "candidates"):
+            self.assertIn(part, text[re.search(r"(?i)(each|every) batch", text).start():])
 
 
 class References(unittest.TestCase):
@@ -198,6 +207,46 @@ class Commands(unittest.TestCase):
             if span.startswith("--"):
                 for flag in re.findall(r"--[a-z][a-z0-9-]*", span):
                     self.assertIn(flag, known | self.OTHER, f"{where}: {span}")
+
+
+class AfterABatch(unittest.TestCase):
+    """The command order of budget.md "After a batch", run as written, ends in a review that shows the estimate."""
+
+    def review(self, idle_hours, counted):
+        with tempfile.TemporaryDirectory() as tmp:
+            e = dict(os.environ, ORCHESTRATE_HOME=os.path.join(tmp, "h"), ORCHESTRATE_PROJECTS=os.path.join(tmp, "p"),
+                     ORCHESTRATE_APP_SESSIONS=os.path.join(tmp, "none"), HOME=tmp)
+
+            def run(*a):
+                r = subprocess.run([sys.executable, *a], env=e, cwd=HERE, capture_output=True, text=True)
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+                return r.stdout
+
+            os.makedirs(os.path.join(tmp, "p", "proj"))
+            ts = (datetime.now(timezone.utc) - timedelta(hours=idle_hours)).isoformat()
+            with open(os.path.join(tmp, "p", "proj", "s1.jsonl"), "w") as f:
+                f.write(json.dumps({"type": "assistant", "sessionId": "s1", "timestamp": ts, "message": {
+                    "id": "m1", "model": "claude-sonnet-5-5", "usage": {"input_tokens": 1000000, "output_tokens": 0}}}) + "\n")
+            run("route.py", "pick", "--task", "t", "--kind", "feature", "--size", "M", "--sites", "3", "--spec", "agreed",
+                "--verifier", "exists")
+            run("route.py", "bind", "--task", "t", "--session", "s1")
+            if counted:
+                self.assertIn("1 rows written", run("usage.py", "sync"))
+            block = re.search(r"(?ms)^```[a-z]*\n(.*?)^```", section(REFS["references/budget.md"], "After a batch"))
+            self.assertIsNotNone(block, "the order is a block of commands")
+            out = ""
+            for line in block.group(1).splitlines():
+                for old, new in (("<kind>", "feature"), ("<id>", "s1"), ("LO HI", "1 99e6"), ("python3 <skill dir>/", "")):
+                    line = line.replace(old, new)
+                out = run(*shlex.split(line))
+            return out
+
+    def test_both_cases(self):
+        for idle, counted in ((7, True), (7, False), (1, False)):
+            with self.subTest(idle_hours=idle, already_counted=counted):
+                out = self.review(idle, counted)
+                self.assertNotIn("no estimate", out)
+                self.assertIn("1 of 1 inside", out)
 
 
 class Chain(unittest.TestCase):

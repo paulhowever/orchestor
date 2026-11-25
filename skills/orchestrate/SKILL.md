@@ -48,7 +48,7 @@ You own a landing queue: one session lands at a time, in an order you state.
 5. **Land** by the project's path: a PR and merge, or a fast-forward push. Run a push to the default branch on a command line of its own, after any commit, merge or rebase: no check can have seen a commit made on the same line, so the push guard denies it.
 6. **Then** record `route.py outcome` (section 3) and send the "main moved" message from `templates.md` to every running writing session whose branch is now behind. If the project deploys, start the next deploy only after the previous one is verified (version or log on the server, read-only).
 
-**Several ready branches** land as a chain, so that one yes is enough. B is rebased on A, C on B, each re-runs its checks, and you run `land_check.py A`, `land_check.py B --base A`, `land_check.py C --base B`. Ask once, naming the order and every final commit: "land A @ sha, then B @ sha, then C @ sha". Then, for each in turn: `git fetch`, `land_check.py <branch> --base origin/<default branch>` (the push guard accepts only a record made against the default branch), and the push. If a commit is no longer the one the yes named, ask again.
+**Several ready branches** land as a chain, so that one yes is enough. B is rebased on A, C on B, each re-runs its checks, and you run `land_check.py A`, `land_check.py B --base A`, `land_check.py C --base B`. Ask once, naming the order, every final commit and the target: "land on main: A @ sha, then B @ sha, then C @ sha". Then finish each branch before you start the next: `git fetch`, `land_check.py <branch> --base origin/<default branch>` (the push guard accepts only a record made against the default branch), the push, and all of step 6, so that a deploy of A is verified before B is pushed. If a commit is no longer the one the yes named, ask again.
 
 ## 7. Archive finished sessions
 
@@ -75,7 +75,7 @@ Open each at its moment. They do not lead to one another.
 | [references/split.md](references/split.md) | before you split a message or size a task |
 | [references/budget.md](references/budget.md) | before a batch starts, when a limit is hit, after a batch closes |
 | [references/brief.md](references/brief.md) | before you write a brief, and when a hook sends one back |
-| [references/tracking.md](references/tracking.md) | when a session is silent or stuck, one you did not start appears, or a new batch comes while one runs |
+| [references/tracking.md](references/tracking.md) | when a session is silent or stuck, one you did not start appears, a new batch comes while one runs, or `route.py fail` prints a fresh session |
 | [references/quality.md](references/quality.md) | when a task is a review, an audit, debt or a freeze, and before you write to the findings ledger |
 | [templates.md](templates.md) | at each memory point (digest, state note, ledger), before each start (file overlap), before a review, after a landing |
 
@@ -101,7 +101,10 @@ A silent hook is not the user's yes. Without the plugin (hand install) there are
 - No → do everything in this session and stop reading this skill.
 - If your brief or first message says you are a worker session started by an orchestrator, never orchestrate.
 
-Before a new batch, read the state note and reconcile it (section 8a).
+At the start of every batch, whatever its tasks:
+1. Read the state note and reconcile it (section 8a).
+2. If memory holds a freeze, check its exit and its date. When the exit holds, say so and offer to unfreeze. On the date without the exit, show the numbers and what blocks them.
+3. Outside a freeze, offer debt candidates from the findings ledger (hot spots first; start one only on the user's yes), and say in one line when debt is above about 25% or stayed at 0 for three batches in a row.
 
 ## 1. Split the message
 
@@ -136,7 +139,7 @@ A finding without `run` evidence is P2 at most, unless it is about security or d
 2. **Pick before each start**, with a card of facts, not a feeling of difficulty: `route.py pick --task <slug> --kind <kind> --size <S|M|L> --sites <N|unknown> --spec <agreed|open> --verifier <exists|can-be-written|human-only> --risk <flags|none> --parent-effort <effort>`. Put the printed card block into the brief. A risk flag (data, auth, money, public-api, hard-to-undo) means a review before landing and no automatic escalation: a failure goes to the user.
 3. **Override** only with a reason: `--override <model>/<effort> --reason "<why>"`.
 4. **Bind after the start:** `route.py bind --task <slug> --session <id>`. Then call `get_session` and compare model and effort with what was agreed: `start_session` can quietly drop an effort above yours or a model that costs more than yours. If they differ, fix them with `set_session_model` / `set_session_effort` and check again; if that does not take, tell the user in one line and note it in the digest.
-5. **After a failed check:** `route.py fail --task <slug> --evidence "<command> -> <failing result>"`, and do what it prints: one informed retry, then at most two climbs, then split or ask.
+5. **After a failed check:** `route.py fail --task <slug> --evidence "<command> -> <failing result>"`, and do what it prints: one informed retry, then at most two climbs, then split or ask. When it prints a fresh session, follow `references/tracking.md`: one task never has two live writers.
 6. **After landing or dropping:** `route.py outcome --task <slug> --result <landed|dropped|reverted> --rounds <N> --p0p1 <N>`.
 
 Name the model in the line that introduces each session, and say why when it is the strongest. Model names live in `routes.json`; if `start_session` does not accept one, use its name for that tier. Parallel sessions at high effort spend quota fast; weigh that on large batches.
@@ -149,7 +152,7 @@ When the criteria hold, the task is done: further P2 and P3 suggestions go to th
 
 ## 4. Write each brief
 
-1. **Look for a duplicate** in `list_sessions` and the digest: the same task, ticket or branch. If a session holds it, send it a follow-up; if that session is archived or failed, say so and ask before starting again.
+1. **Look for a duplicate** in `list_sessions` and the digest: the same task, ticket or branch. If a session holds it, send it a follow-up; if that session is archived or failed (a climb to a fresh session too), say so and ask before starting again.
 2. **Write the brief from `references/brief.md`.** The hook checks these parts: the first line "You are a worker session started by an orchestrator. Do not orchestrate or ask about it.", "Acceptance criteria", a "Stop line", the boundaries `Always:`, `Ask first:` and `Never:`, hard rules 1–3 word for word, and the receipt.
 3. **Start it** with `start_session`: fresh context, its own worktree and branch (`use_worktree: true`) for anything that writes, a short name, the model and effort from section 3. A task in another repository starts with that repository as its folder (see `list_start_targets`); if you cannot start it there, give the user the brief to start by hand. Follow the tool's own schema for the other fields.
 4. **Bind and check** it (section 3).

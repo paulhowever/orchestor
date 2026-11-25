@@ -26,9 +26,15 @@ Without `get_usage` (plain CLI), work in weighted tokens and say that percents a
 
 `usage.py sync` writes the actual cost of each task that `route.py bind` tied to a session. `land_check.py` runs it after `ok to land` and `ok to archive`; run it by hand for tasks that land without it. A session is counted once it is archived or idle for 6 hours, and its row is refreshed if it goes on.
 
-`usage.py log --type <kind> --session <id> --est LO HI` is left for one thing: storing the estimate range. `sync` copies that range into its own row for the same session and kind, so use the kind on the route card.
+For each finished task that had an estimate, store its range, then sync and review, in this order:
 
-Then run `usage.py review` to see estimates against actuals, and say in the digest which kinds run over.
+```
+python3 <skill dir>/usage.py log --type <kind> --session <id> --est LO HI
+python3 <skill dir>/usage.py sync
+python3 <skill dir>/usage.py review
+```
+
+`log` is left for this one thing: storing the estimate range. `sync` copies the range into its own row for the same session and kind, so use the kind on the route card. The `sync` after `log` is needed even when the session was counted before, or `review` shows its row without an estimate. With several tasks, run `log` for each, then `sync` and `review` once. Say in the digest which kinds run over.
 
 ## Calibration
 
