@@ -1,0 +1,80 @@
+{
+  "reviewed": "2026-11-25",
+  "note": "Untested synthesis of published evidence: no cell was measured on this user's tasks. Review on each model release and about every 50 tasks; move one cell at a time. Model names live only in this file.",
+  "tiers": [
+    {"tier": "smallest", "model": "claude-haiku-5-5", "label": "Haiku 5.5"},
+    {"tier": "cheap", "model": "claude-sonnet-5-5", "label": "Sonnet 5.5"},
+    {"tier": "strong", "model": "claude-opus-5-5", "label": "Opus 5.5"},
+    {"tier": "top", "model": "claude-fable-5-2", "label": "Fable 5.2"}
+  ],
+  "strong_tier": "strong",
+  "routes": [
+    {
+      "id": "open-or-unknown",
+      "any": [
+        {"spec": ["open"]},
+        {"kind": ["fix-unknown-cause", "design"]}
+      ],
+      "ladder": ["strong/high", "top/high"],
+      "why": "the cause, the design or the spec is still open"
+    },
+    {
+      "id": "listed-edits",
+      "any": [
+        {"kind": ["docs-config"]},
+        {"kind": ["rename"], "sites": "known"}
+      ],
+      "ladder": ["cheap/medium", "cheap/high"],
+      "why": "docs, config, or a rename with a full list of places"
+    },
+    {
+      "id": "small-checked",
+      "any": [
+        {"kind": ["fix-known-cause", "feature"], "size": ["S"], "sites_max": 2, "verifier": ["exists", "human-only"]}
+      ],
+      "ladder": ["cheap/high", "strong/high"],
+      "why": "small agreed change in one or two places"
+    },
+    {
+      "id": "agreed-feature",
+      "any": [
+        {"kind": ["fix-known-cause", "feature"]}
+      ],
+      "ladder": ["strong/medium", "strong/high"],
+      "why": "agreed change that is M or larger, spreads to 3+ sites, or has no ready check"
+    },
+    {
+      "id": "completeness",
+      "any": [
+        {"kind": ["refactor", "tests", "migration", "ui", "rename"]}
+      ],
+      "ladder": ["strong/medium", "strong/high", "top/high"],
+      "checklist": true,
+      "why": "green tests do not show that every place was covered"
+    },
+    {
+      "id": "code-research",
+      "any": [
+        {"kind": ["code-research"]}
+      ],
+      "ladder": ["strong/medium", "strong/high"],
+      "why": "code questions need a strong reader, never the smallest tier"
+    },
+    {
+      "id": "web-research",
+      "any": [
+        {"kind": ["web-research"]}
+      ],
+      "ladder": ["cheap/medium", "strong/medium"],
+      "why": "the gap between tiers on web research is small"
+    },
+    {
+      "id": "review",
+      "any": [
+        {"kind": ["review"]}
+      ],
+      "ladder": ["strong/medium", "strong/high"],
+      "why": "reviews lose quality below medium and above high"
+    }
+  ]
+}
