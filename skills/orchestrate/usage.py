@@ -1,56 +1,92 @@
 #!/usr/bin/env python3
 """Token spend per Claude Code session, estimates, and calibration to plan-limit percents.
 
-Reads transcripts in ~/.claude/projects/*/*.jsonl (usage numbers only, never message text).
-No dependencies. Python 3.8+.
+Reads transcripts in ~/.claude/projects (usage numbers only, never message text): main ones, and the
+subagent and workflow ones, which count towards their parent session. No dependencies. Python 3.8+.
 
   usage.py tokens [--session ID | --self] [--project P] [--since T] [--until T] [--json]
   usage.py days [--project P] [--since T] [--until T] [--json]     totals per local day
   usage.py log --type TYPE --session ID --est LO HI [--effort E] [--size S|M|L|XL]   append estimate vs actual
+  usage.py sync [--quiet]                       one row per task in routes.jsonl whose session has ended
   usage.py review [--type TYPE]                 estimate against actual, inside / over / under
   usage.py estimate --type TYPE [--size S|M|L|XL] [--model M] [--ctx TOKENS --steps LO-HI]   range for a new task
   usage.py calibrate PCT@TIME PCT@TIME          weighted tokens per 1% from two get_usage readings
   usage.py calibration                          show saved calibrations
 
+ID is the desktop app's id (local_...) or the transcript id. The app keeps the link between them in
+$ORCHESTRATE_APP_SESSIONS (default ~/Library/Application Support/Claude/claude-code-sessions, undocumented,
+macOS); without that folder only transcript ids work.
+"Ended" for `sync`: archived in the app, or no message for 6 hours. A row is refreshed if the session goes on.
 T is an ISO time ("2026-11-07T00:00", "2026-11-07 09:30+03:00") a relative "6h" / "2d" ago, or "now".
 Naive times are local. The log and calibrations live in $ORCHESTRATE_HOME (default ~/.claude/orchestrate).
 """
-import argparse, glob, json, os, sys
+import argparse, contextlib, glob, itertools, json, os, re, sys
+from collections import namedtuple
 from datetime import datetime, timedelta, timezone
 
-# --- Price table: $ per 1M tokens (in, out, cache read). Source: the `claude-api` skill,
-# "Current Models" (cached 2026-10-06). Re-read it when models change.
-# Models whose cache-read price the skill does not state use 0.1 x input (assumption).
-# Cache write is not in the table either: standard 1.25 x input (5 min), 2 x input (1 h).
+# --- Price table: $ per 1M tokens (in, out, cache read). Source, read on PRICES_DATE:
+# https://platform.claude.com/docs/en/about-claude/pricing.md ("Model pricing"; cache writes on every row are
+# 1.25 x input for 5 min and 2 x input for 1 h). Change PRICES_DATE with the table: it marks rows and
+# calibrations as made with other prices. Bump SCHEMA when what is counted changes (1 = no subagents,
+# copies in forks counted again).
+PRICES_DATE, SCHEMA = "2026-11-25", 2
 PRICES = {
-    "claude-fable-5":   (10.0, 50.0, 0.25),
-    "claude-opus-5-5":  (4.0, 20.0, 0.20),
-    "claude-opus-5":    (5.0, 25.0, 0.50),
-    "claude-opus-4":    (5.0, 25.0, 0.50),
-    "claude-sonnet-5":  (2.0, 10.0, 0.20),
-    "claude-sonnet-4":  (3.0, 15.0, 0.30),
-    "claude-haiku-5":   (0.10, 0.50, 0.01),
-    "claude-haiku-4":   (1.0, 5.0, 0.10),
+    "claude-fable-5-2":  (8.0, 40.0, 0.20),
+    "claude-fable-5-1":  (10.0, 50.0, 0.25),
+    "claude-fable-5":    (10.0, 50.0, 1.00),
+    "claude-mythos-5-2": (8.0, 40.0, 0.20),
+    "claude-mythos-5-1": (10.0, 50.0, 0.25),
+    "claude-mythos-5":   (10.0, 50.0, 1.00),
+    "claude-opus-5-5":   (4.0, 20.0, 0.20),
+    "claude-opus-5":     (5.0, 25.0, 0.50),
+    "claude-opus-4-8":   (5.0, 25.0, 0.50),
+    "claude-opus-4-7":   (5.0, 25.0, 0.50),
+    "claude-opus-4-6":   (5.0, 25.0, 0.50),
+    "claude-opus-4-5":   (5.0, 25.0, 0.50),
+    "claude-opus-4-1":   (15.0, 75.0, 1.50),
+    "claude-opus-4":     (15.0, 75.0, 1.50),
+    "claude-sonnet-5-5": (2.0, 10.0, 0.10),
+    "claude-sonnet-5":   (2.0, 10.0, 0.20),
+    "claude-sonnet-4-6": (3.0, 15.0, 0.30),
+    "claude-sonnet-4-5": (3.0, 15.0, 0.30),
+    "claude-sonnet-4":   (3.0, 15.0, 0.30),
+    "claude-haiku-5-5":  (0.10, 0.50, 0.01),
+    "claude-haiku-4-5":  (1.0, 5.0, 0.10),
 }
-UNKNOWN = "claude-opus-5-5"          # used for models not in the table (flagged in output)
+# Requests with a longer prompt (input + cache reads + cache writes) pay the second row in full.
+LONG = {"claude-haiku-5-5": (100000, (0.50, 2.50, 0.05))}
+# what may follow a table name in a model id: a date, a cloud version, a variant
+SUFFIX = re.compile(r"(-latest|-\d{8})?(-v\d+(:\d+)?)?(@[\w-]+)?(\[\w+\])?$")
+UNKNOWN = "claude-opus-5-5"          # used for models with no name in common with the table
 BASE = 2.0                           # 1 weighted token = 1 input token of Sonnet 5.5 ($2/M)
 W5M, W1H = 1.25, 2.0                 # cache-write multipliers on input price
 # Fallback when there is no history: per step = re-read the context + a little output and cache growth.
 STEP_OUT, STEP_GROW = 1500, 12000   # measured on 2 real Opus 5.5 sessions: ~1.4k out, ~13k cache write per message
 MIN_LINES = 3                        # fewer past lines of a type than this -> fallback
 MIN_PCT = 3                          # calibration spans under this many percent are refused
+IDLE_HOURS = 6                       # `sync`: a session with no message for this long has ended
 
 HOME = os.environ.get("ORCHESTRATE_HOME") or os.path.expanduser("~/.claude/orchestrate")
-LOG, CAL = os.path.join(HOME, "estimates.jsonl"), os.path.join(HOME, "calibration.jsonl")
+LOG, CAL, ROUTES = (os.path.join(HOME, n) for n in ("estimates.jsonl", "calibration.jsonl", "routes.jsonl"))
+PROJECTS = os.path.expanduser(os.environ.get("ORCHESTRATE_PROJECTS") or "~/.claude/projects")
+APP = os.path.expanduser(os.environ.get("ORCHESTRATE_APP_SESSIONS")
+                         or "~/Library/Application Support/Claude/claude-code-sessions")
+
+# One assistant message. session = the transcript id that pays for it; sub = made by a subagent.
+Msg = namedtuple("Msg", "session project model ts input output cache_read cw5 cw1 sub effort")
 
 
-def price(model):
+def price(model, prompt=0):
+    """-> (in, out, cache read) and the table name it is only a guess from (None when the model is in the table)."""
+    model = model[max(model.find("claude-"), 0):]
     best = max((k for k in PRICES if model.startswith(k)), key=len, default=None)
-    return PRICES[best or UNKNOWN], best is None
+    guess = None if best and SUFFIX.match(model[len(best):]) else best or UNKNOWN
+    limit, long_row = LONG.get(best, (0, None))
+    return (long_row if long_row and prompt > limit else PRICES[best or UNKNOWN]), guess
 
 
 def weigh(model, inp, out, cr, cw5, cw1):
-    (pi, po, pr), _ = price(model)
+    (pi, po, pr), _ = price(model, inp + cr + cw5 + cw1)
     return (inp * pi + out * po + cr * pr + cw5 * pi * W5M + cw1 * pi * W1H) / BASE
 
 
@@ -64,68 +100,198 @@ def parse_time(s):
     return d if d.tzinfo else d.astimezone()
 
 
-def messages(session=None, since=None, until=None, project=None):
-    """-> list of (session, project, model, ts, input, output, cache_read, cw5, cw1).
-
-    One entry per unique assistant message id (last copy wins). Only usage numbers are read."""
-    msgs = {}
-    root = os.environ.get("ORCHESTRATE_PROJECTS") or "~/.claude/projects"
-    for f in glob.glob(os.path.join(os.path.expanduser(root), "*", "*.jsonl")):
-        proj = os.path.basename(os.path.dirname(f))
-        if session and session not in os.path.basename(f):
-            continue
-        if project and project not in proj:
-            continue
-        if since and datetime.fromtimestamp(os.path.getmtime(f), timezone.utc) < since:
-            continue
-        sid_file = os.path.basename(f)[:-6]
-        with open(f, errors="replace") as fh:
-            for line in fh:
-                if '"usage"' not in line or '"assistant"' not in line:
-                    continue
-                try:
-                    d = json.loads(line)
-                    m = d["message"]; u = m["usage"]; ts = parse_time(d["timestamp"])
-                except Exception:
-                    continue
-                if d.get("type") != "assistant" or not m.get("model") or m["model"].startswith("<"):
-                    continue
-                if (since and ts < since) or (until and ts > until):
-                    continue
-                cc = u.get("cache_creation") or {}
-                cw1 = cc.get("ephemeral_1h_input_tokens", 0)
-                cw5 = cc.get("ephemeral_5m_input_tokens", u.get("cache_creation_input_tokens", 0) - cw1)
-                msgs[(sid_file, m.get("id") or d.get("uuid"))] = (
-                    d.get("sessionId") or sid_file, proj, m["model"], ts,
-                    u.get("input_tokens", 0), u.get("output_tokens", 0),
-                    u.get("cache_read_input_tokens", 0), cw5, cw1)
-    return list(msgs.values())
+# --- Session ids
+class UnknownSession(Exception):
+    pass
 
 
-def group(rows, key):
-    """Sum message rows into {key(row): stats}."""
+def app_sessions():
+    """-> {app id: {"cli": [transcript ids, current one last], "archived": bool}} from the app's metadata files."""
     out = {}
-    for r in rows:
-        sid, proj, model, ts, i, o, cr, cw5, cw1 = r
-        k = key(r)
-        s = out.setdefault(k, dict(key=k, session=sid, project=proj, input=0, output=0, cache_read=0,
-                                   cache_write=0, messages=0, weighted=0.0, models={}, sessions=set(),
-                                   first=ts, last=ts, unpriced=False))
-        s["input"] += i; s["output"] += o; s["cache_read"] += cr; s["cache_write"] += cw5 + cw1
-        s["messages"] += 1; s["weighted"] += weigh(model, i, o, cr, cw5, cw1)
-        s["models"][model] = s["models"].get(model, 0) + 1
-        s["sessions"].add(sid)
-        s["first"], s["last"] = min(s["first"], ts), max(s["last"], ts)
-        s["unpriced"] |= price(model)[1]
-    for s in out.values():
-        s["model"] = max(s["models"], key=s["models"].get)
-        s["sessions"] = len(s["sessions"])
+    for f in glob.glob(os.path.join(glob.escape(APP), "**", "*.json"), recursive=True):
+        try:
+            with open(f, errors="replace") as fh:
+                d = json.load(fh)
+            aid, cli = d["sessionId"], d["cliSessionId"]
+            old = [x for x in d.get("priorCliSessionIds") or [] if isinstance(x, str) and x != cli]
+        except Exception:
+            continue                 # another kind of file, or a session with no transcript yet
+        if isinstance(aid, str) and isinstance(cli, str):
+            out[aid] = {"cli": old + [cli], "archived": bool(d.get("isArchived"))}
     return out
 
 
-def scan(session=None, since=None, until=None, project=None):
-    """-> {session_id: stats}."""
-    return group(messages(session, since, until, project), key=lambda r: r[0])
+def app_of(apps):
+    """-> {transcript id: app id}; the session that uses the transcript now wins over one that used it before."""
+    out = {}
+    for current in (False, True):
+        for aid, a in apps.items():
+            for t in a["cli"][-1:] if current else a["cli"][:-1]:
+                out[t] = aid
+    return out
+
+
+def transcript_files():
+    """-> [(file, project, top transcript id, is a subagent's)]. Layout: <project>/<id>.jsonl, and under
+    <project>/<id>/subagents/ the agents' and (workflows/<run>/) the workflow agents' transcripts."""
+    out = []
+    for d in glob.glob(os.path.join(glob.escape(PROJECTS), "*")):
+        proj = os.path.basename(d)
+        out += [(f, proj, os.path.basename(f)[:-6], False) for f in glob.glob(os.path.join(glob.escape(d), "*.jsonl"))]
+        for f in glob.glob(os.path.join(glob.escape(d), "*", "subagents", "**", "*.jsonl"), recursive=True):
+            out.append((f, proj, os.path.relpath(f, d).split(os.sep)[0], True))
+    return out
+
+
+def resolve(sid, apps, tops):
+    """App id, transcript id or a part of one -> (app id or None, [transcript ids of that session]).
+
+    A part of an id may fit several sessions: then the list has them all and the app id is None."""
+    apps_by_cli = app_of(apps)
+    hits = [a for a in (sid, "local_" + sid) if a in apps]
+    if not hits and sid.startswith("local_"):
+        bare = sid[len("local_"):]
+        if bare in tops:
+            return apps_by_cli.get(bare) or sid, [bare]
+        hits = [a for a in apps if a.startswith(sid)]
+        if len(hits) != 1:
+            raise UnknownSession(f"session {sid}: " + (
+                f"{len(hits)} app sessions start like this; give the full id" if hits
+                else f"not in the app's metadata at {APP}" if os.path.isdir(APP)
+                else f"this is an app id, and the app's metadata folder {APP} is absent")
+                + ". Pass the transcript id, or set ORCHESTRATE_APP_SESSIONS to the folder.")
+    if not hits:
+        found = [sid] if sid in tops or sid in apps_by_cli else sorted(t for t in tops if sid in t)
+        if len(found) != 1 or found[0] not in apps_by_cli:
+            return None, found
+        hits = [apps_by_cli[found[0]]]
+    return hits[0], apps[hits[0]]["cli"]
+
+
+# --- Reading transcripts
+def records(f):
+    """Yield (kind, id, time, line as dict) for the assistant messages and compaction marks of one file."""
+    with open(f, errors="replace") as fh:
+        for line in fh:
+            if not ('"usage"' in line and '"assistant"' in line) and '"compact_boundary"' not in line:
+                continue
+            try:
+                d = json.loads(line)
+                if d.get("type") == "system" and d.get("subtype") == "compact_boundary":
+                    yield "compact", d["uuid"], parse_time(d["timestamp"]), d
+                elif d.get("type") == "assistant" and d["message"].get("model") and not d["message"]["model"].startswith("<"):
+                    d["message"]["usage"].get("input_tokens")
+                    yield "message", d["message"].get("id") or d["uuid"], parse_time(d["timestamp"]), d
+            except Exception:
+                continue
+
+
+def load(sessions=None, since=None, until=None, project=None, files=None):
+    """-> ([Msg], {transcript id: compactions}).
+
+    Forked and resumed sessions start with a copy of the old messages, so every id counts once over all files.
+    It goes to the session named in the record if that one has a copy (a fork keeps the name); when each copy
+    names its own file (a resume rewrites it), to the oldest file. `sessions` filters after that."""
+    copies, born = {}, {}
+    files = transcript_files() if files is None else files
+    if sessions is not None:         # a file untouched since before their first message cannot share messages with them
+        starts = [r[2] for f in files if f[2] in sessions for r in itertools.islice(records(f[0]), 1)]
+        if not starts:
+            return [], {}
+        since = max(since, min(starts)) if since else min(starts)
+    for f, proj, top, sub in files:
+        try:
+            st = os.stat(f)
+        except OSError:
+            continue
+        if since and datetime.fromtimestamp(st.st_mtime, timezone.utc) < since:
+            continue
+        last = None
+        for kind, mid, ts, d in records(f):
+            last = max(last, ts) if last else ts
+            if (since and ts < since) or (until and ts > until):
+                continue
+            copies.setdefault((kind, mid), []).append((top, d.get("sessionId"), proj, sub, ts, slim(d)))
+        if last and not sub:         # no birth time on this system -> the file that stopped first
+            born[top] = min(born.get(top, (float("inf"),)), (getattr(st, "st_birthtime", 0), last.timestamp()))
+    rows, compacts = [], {}
+    for (kind, _), cs in copies.items():
+        tops = {c[0] for c in cs}
+        named = {c[1] for c in cs} & tops
+        owner = min(named or tops, key=lambda t: (born.get(t, (float("inf"),)), t))
+        mine = [c for c in cs if c[0] == owner]
+        proj, sub = mine[0][2], all(c[3] for c in mine)
+        if (sessions is not None and owner not in sessions) or (project and project not in proj):
+            continue
+        if kind == "compact":
+            compacts[owner] = compacts.get(owner, 0) + (not sub)
+            continue
+        top, _, _, _, ts, (model, effort, side, u) = max(cs, key=lambda c: c[5][3][1])  # the fullest copy
+        rows.append(Msg(owner, proj, model, ts, *u, sub or side, effort))
+    return rows, compacts
+
+
+def slim(d):
+    """The model, effort, sidechain flag and five token counts of an assistant record."""
+    m = d.get("message") or {}
+    u = m.get("usage") or {}
+    cc = u.get("cache_creation") or {}
+    cw1 = cc.get("ephemeral_1h_input_tokens") or 0
+    cw5 = cc.get("ephemeral_5m_input_tokens")
+    if cw5 is None:
+        cw5 = (u.get("cache_creation_input_tokens") or 0) - cw1
+    return m.get("model"), d.get("effort") or "", bool(d.get("isSidechain")), (
+        u.get("input_tokens") or 0, u.get("output_tokens") or 0, u.get("cache_read_input_tokens") or 0, cw5, cw1)
+
+
+def top_of(counts):
+    return max(sorted(counts), key=counts.get) if counts else ""
+
+
+def group(rows, key):
+    """Sum message rows into {key(row): stats}. Model, effort and peak context are the main thread's."""
+    out = {}
+    for r in rows:
+        k = key(r)
+        s = out.setdefault(k, dict(key=k, session=r.session, project=r.project, input=0, output=0, cache_read=0,
+                                   cache_write=0, messages=0, weighted=0.0, sub_weighted=0.0, sub_messages=0,
+                                   peak_context=0, models={}, main={}, efforts={}, sessions=set(),
+                                   first=r.ts, last=r.ts, unpriced=False, priced_as=None))
+        w = weigh(r.model, r.input, r.output, r.cache_read, r.cw5, r.cw1)
+        s["input"] += r.input; s["output"] += r.output; s["cache_read"] += r.cache_read
+        s["cache_write"] += r.cw5 + r.cw1; s["messages"] += 1; s["weighted"] += w
+        s["models"][r.model] = s["models"].get(r.model, 0) + 1
+        if r.sub:
+            s["sub_weighted"] += w; s["sub_messages"] += 1
+        else:
+            s["main"][r.model] = s["main"].get(r.model, 0) + 1
+            s["efforts"][r.effort] = s["efforts"].get(r.effort, 0) + 1
+            s["peak_context"] = max(s["peak_context"], r.input + r.cache_read + r.cw5 + r.cw1)
+        s["sessions"].add(r.session)
+        s["first"], s["last"] = min(s["first"], r.ts), max(s["last"], r.ts)
+        s["priced_as"] = s["priced_as"] or price(r.model)[1]
+    for s in out.values():
+        s["model"], s["effort"] = top_of(s.pop("main") or s["models"]), top_of(s.pop("efforts"))
+        s["sessions"], s["unpriced"] = len(s["sessions"]), bool(s["priced_as"])
+    return out
+
+
+def scan(session=None, since=None, until=None, project=None, merge=False):
+    """-> {transcript id: stats}; merge=True sums all transcripts of the one session under its current id."""
+    files, apps, ids = transcript_files(), app_sessions(), None
+    if session:
+        try:
+            aid, ids = resolve(session, apps, {f[2] for f in files})
+        except UnknownSession as e:
+            sys.exit(str(e))
+        if merge and not aid and len(ids) > 1:
+            sys.exit(f"{len(ids)} transcripts match '{session}'; give the full id")
+    rows, _ = load(ids, since, until, project, files)
+    out = group(rows, key=lambda r: ids[-1] if merge else r.session)
+    names = app_of(apps)
+    for k, s in out.items():
+        s["session"], s["app_session"] = k, names.get(k)
+    return out
 
 
 def fmt(n):
@@ -134,16 +300,59 @@ def fmt(n):
 
 
 def read_jsonl(path):
+    return [r for _, r in read_lines(path) if r is not None]
+
+
+def read_lines(path):
+    """-> [(line, object or None if the line is not a JSON object)]; a missing file is empty."""
+    out = []
     try:
-        return [json.loads(l) for l in open(path) if l.strip()]
+        with open(path, errors="surrogateescape") as fh:
+            lines = [l for l in fh.read().split("\n") if l.strip()]
     except OSError:
-        return []
+        return out
+    for l in lines:
+        try:
+            r = json.loads(l)
+        except ValueError:
+            r = None
+        out.append((l, r if isinstance(r, dict) else None))
+    return out
+
+
+@contextlib.contextmanager
+def locked():
+    """`sync` rewrites the log that `log` appends to, and hooks may start two syncs at once."""
+    os.makedirs(HOME, exist_ok=True)
+    with open(os.path.join(HOME, ".lock"), "w") as fh:
+        try:
+            import fcntl
+            fcntl.flock(fh, fcntl.LOCK_EX)
+        except (ImportError, OSError):
+            pass                     # no file locks on this system
+        yield
 
 
 def append(path, rec):
-    os.makedirs(HOME, exist_ok=True)
-    with open(path, "a") as fh:
+    with locked(), open(path, "a") as fh:
         fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+
+def is_old(rec):
+    return rec.get("schema") != SCHEMA or rec.get("prices") != PRICES_DATE
+
+
+def history(task_type=None):
+    """Rows of the log. A hand-made line for a session and type that `sync` has a row for is left out."""
+    rows = [r for r in read_jsonl(LOG) if "actual" in r and (not task_type or r.get("task_type") == task_type)]
+    synced = {(t, r.get("task_type")) for r in rows if r.get("source") == "sync" for t in r.get("sessions") or []}
+    return [r for r in rows if r.get("source") == "sync" or (r.get("session"), r.get("task_type")) not in synced]
+
+
+def warn_old_cal(c):
+    if is_old(c):
+        print(f"  warning: the {c['date']} calibration uses old accounting (other prices, or no subagents), so these "
+              "percents are off; run `calibrate` with two new readings")
 
 
 def latest_cal(window="weekly"):
@@ -166,30 +375,37 @@ def dump(rows):
     print(json.dumps(rows, indent=1))
 
 
+def share(s):
+    return f"{100 * s['sub_weighted'] / s['weighted'] if s['weighted'] else 0:.0f}%"
+
+
 def cmd_tokens(a):
-    rows = sorted(scan(own_session(a), a.since, a.until, a.project).values(), key=lambda s: -s["weighted"])
+    me = getattr(a, "self", False)
+    rows = sorted(scan(own_session(a), a.since, a.until, a.project, merge=me).values(), key=lambda s: -s["weighted"])
     if a.json:
         dump(rows); return
-    if getattr(a, "self", False) and rows:
+    if me and rows:
         s = rows[0]
         mins = (s["last"] - s["first"]).total_seconds() / 60
         print(f"tokens: in {fmt(s['input'])}, out {fmt(s['output'])}, cache read {fmt(s['cache_read'])}, "
               f"cache write {fmt(s['cache_write'])}; weighted {fmt(s['weighted'])}; "
-              f"{s['messages']} messages over {mins:.0f} min; {s['model']}")
+              f"{s['messages']} messages over {mins:.0f} min; {s['model']}"
+              + (f"; subagents {share(s)}" if s["sub_messages"] else ""))
         return
-    print(f"{'session':36} {'msgs':>5} {'input':>7} {'output':>7} {'c.read':>8} {'c.write':>8} {'weighted':>9}  model")
+    print(f"{'session':36} {'msgs':>5} {'input':>7} {'output':>7} {'c.read':>8} {'c.write':>8} {'weighted':>9} {'sub':>4}  model")
     for s in rows[: a.top]:
         print(f"{s['session']:36} {s['messages']:5} {fmt(s['input']):>7} {fmt(s['output']):>7} "
-              f"{fmt(s['cache_read']):>8} {fmt(s['cache_write']):>8} {fmt(s['weighted']):>9}  {s['model']}"
-              + ("  (price unknown, used " + UNKNOWN + ")" if s["unpriced"] else ""))
-    t = sum(s["weighted"] for s in rows)
-    print(f"{len(rows)} sessions, total weighted {fmt(t)} (1 = one Sonnet 5.5 input token)")
+              f"{fmt(s['cache_read']):>8} {fmt(s['cache_write']):>8} {fmt(s['weighted']):>9} {share(s) if s['sub_messages'] else '-':>4}  {s['model']}"
+              + (f"  (price unknown, used {s['priced_as']})" if s["unpriced"] else ""))
+    t, sub = sum(s["weighted"] for s in rows), sum(s["sub_weighted"] for s in rows)
+    print(f"{len(rows)} sessions, total weighted {fmt(t)} (1 = one Sonnet 5.5 input token); "
+          f"subagents {fmt(sub)} ({share(dict(weighted=t, sub_weighted=sub))})")
 
 
 def cmd_days(a):
     def day(r):
-        return r[3].astimezone().date().isoformat()
-    rows = sorted(group(messages(None, a.since, a.until, a.project), key=day).values(), key=lambda s: s["key"])
+        return r.ts.astimezone().date().isoformat()
+    rows = sorted(group(load(None, a.since, a.until, a.project)[0], key=day).values(), key=lambda s: s["key"])
     if a.json:
         dump(rows); return
     print(f"{'day':10} {'sess':>4} {'msgs':>5} {'input':>7} {'output':>7} {'c.read':>8} {'c.write':>8} {'weighted':>9}")
@@ -201,37 +417,166 @@ def cmd_days(a):
     c = latest_cal(a.window)
     if c and rows:
         print(f"  = {t / c['per_pct']:.0f}% of the limit at the {c['date']} calibration")
+        warn_old_cal(c)
 
 
 def cmd_review(a):
-    rows = [r for r in read_jsonl(LOG) if not a.type or r.get("task_type") == a.type]
+    rows = history(a.type)
     if not rows:
         print("no estimate lines yet"); return
-    inside = 0
+    inside = judged = 0
     for r in rows:
+        head = f"{r['ts'][:10]}  {r['task_type']:12} {r.get('size') or '-':3} "
+        if not r.get("estimate"):
+            print(f"{head}{'no estimate':>15} actual {fmt(r['actual']):>7}"); continue
         lo, hi = r["estimate"]
         mark = "inside" if lo <= r["actual"] <= hi else ("over" if r["actual"] > hi else "under")
-        inside += mark == "inside"
-        print(f"{r['ts'][:10]}  {r['task_type']:12} {r.get('size') or '-':3} {fmt(lo):>7}-{fmt(hi):<7} "
-              f"actual {fmt(r['actual']):>7}  {mark}")
-    print(f"{inside} of {len(rows)} inside the estimate")
+        inside += mark == "inside"; judged += 1
+        print(f"{head}{fmt(lo):>7}-{fmt(hi):<7} actual {fmt(r['actual']):>7}  {mark}"
+              + ("  (old accounting)" if is_old(r) else ""))
+    print(f"{inside} of {judged} inside the estimate")
 
 
 def cmd_log(a):
-    found = scan(a.session, a.since, a.until)
-    s = found.get(a.session) or next(iter(found.values()), None)
+    s = next(iter(scan(a.session, a.since, a.until, merge=True).values()), None)
     if not s:
         sys.exit("no transcript found for that session")
-    rec = dict(ts=datetime.now(timezone.utc).isoformat(timespec="seconds"), session=s["session"], task_type=a.type,
-               model=s["model"], effort=a.effort, messages=s["messages"], weighted=round(s["weighted"]),
-               estimate=[a.est[0], a.est[1]], actual=round(s["weighted"]), size=a.size)
+    rec = dict(ts=datetime.now(timezone.utc).isoformat(timespec="seconds"), session=s["session"],
+               app_session=s["app_session"], task_type=a.type, model=s["model"], effort=a.effort or s["effort"],
+               messages=s["messages"], weighted=round(s["weighted"]), sub_weighted=round(s["sub_weighted"]),
+               estimate=[a.est[0], a.est[1]], actual=round(s["weighted"]), size=a.size,
+               source="log", schema=SCHEMA, prices=PRICES_DATE)
     append(LOG, rec)
     inside = "inside" if a.est[0] <= rec["actual"] <= a.est[1] else "OUTSIDE"
     print(f"logged: {a.type}, actual {fmt(rec['actual'])} vs estimate {fmt(a.est[0])}-{fmt(a.est[1])} ({inside})")
 
 
+# --- sync
+def runs(events):
+    """Task events -> [run]: the plan, the bound sessions and the outcome of one go at a task.
+
+    Several binds are one run (a failed task goes on in a fresh session); a plan after an outcome starts another."""
+    out, live = [], {}
+    for e in events:
+        task, kind = e.get("task"), e.get("event")
+        if not isinstance(task, str) or kind not in ("plan", "bind", "outcome"):
+            continue
+        r = live.get(task)
+        if r is None or (kind == "plan" and r["outcome"]):
+            r = live[task] = dict(task=task, run=r["run"] + 1 if r else 1, plan={}, binds=[], outcome={})
+            out.append(r)
+        if kind == "bind":
+            if isinstance(e.get("session"), str) and e["session"]:
+                r["binds"] = [b for b in r["binds"] if b != e["session"]] + [e["session"]]
+        else:
+            r[kind] = e
+    return out
+
+
+def last_message(files):
+    return max((ts for f in files for _, _, ts, _ in records(f[0])), default=None)
+
+
+def cmd_sync(a):
+    say = (lambda *x: None) if a.quiet else print
+    todo = [r for r in runs(read_jsonl(ROUTES)) if r["binds"]]
+    if not todo:
+        say("sync: no bound tasks in routes.jsonl"); return
+    files, apps = transcript_files(), app_sessions()
+    if not apps:
+        say(f"sync: no app metadata at {APP} (ORCHESTRATE_APP_SESSIONS): app ids cannot be found, "
+            f"a session counts as ended after {IDLE_HOURS} idle hours")
+    tops, by_top, archived = {f[2] for f in files}, {}, {t for x in apps.values() if x["archived"] for t in x["cli"]}
+    for f in files:
+        by_top.setdefault(f[2], []).append(f)
+    with locked():
+        lines = read_lines(LOG)
+        at = {(r.get("task"), r.get("run")): n for n, (_, r) in enumerate(lines) if r and r.get("source") == "sync"}
+        loaded, done, changed = None, 0, 0
+        for run in todo:
+            aid, ids, bad = None, [], []
+            for b in run["binds"]:
+                try:
+                    aid, found = resolve(b, apps, tops)
+                except UnknownSession as e:
+                    bad.append(str(e)); continue
+                if not aid and len(found) != 1:
+                    bad.append(f"session {b}: {len(found)} transcripts match"); continue
+                ids = [t for t in ids if t not in found] + found
+            mine = [f for t in ids for f in by_top.get(t, [])]
+            n = at.get((run["task"], run["run"]))
+            old = lines[n][1] if n is not None else {}
+            kept = {k: old.get(k) for k in FACTS} if old and old.get("sessions") == ids and not is_old(old) else None
+            if bad or not (mine or kept):
+                say(f"sync: {run['task']}: skipped, " + ("; ".join(bad) or "no transcript")); continue
+            # A stamp of the files tells a finished row from one to count again (the count reads every transcript).
+            stamp = [len(mine)] + [max((getattr(os.stat(f[0]), k) for f in mine), default=0)
+                                   for k in ("st_mtime_ns", "st_size")]
+            if kept and (not mine or kept["stamp"] == stamp):
+                facts = kept
+            else:
+                last = last_message(mine)
+                waiting = [t for t in ids if t in by_top and t not in archived]
+                if not last or (waiting and datetime.now(timezone.utc) - (
+                        last_message([f for t in waiting for f in by_top[t]]) or last) < timedelta(hours=IDLE_HOURS)):
+                    say(f"sync: {run['task']}: still running"); continue
+                loaded = loaded or load(files=files)
+                facts = count(ids, loaded, stamp)
+                if kept and (not facts or facts["messages"] < kept["messages"]):
+                    facts = kept     # old transcripts get cleaned up; keep the full count
+                if not facts:
+                    say(f"sync: {run['task']}: skipped, no counted messages"); continue
+            row = outcome_row(run, aid, ids, facts, lines)
+            done += 1
+            if row == old:
+                continue
+            changed += 1
+            entry = (json.dumps(row, ensure_ascii=False), row)
+            if n is None:
+                at[(run["task"], run["run"])] = len(lines)
+                lines.append(entry)
+            else:
+                lines[n] = entry
+        if changed:
+            tmp = LOG + ".tmp"
+            with open(tmp, "w", errors="surrogateescape") as fh:
+                fh.write("".join(l + "\n" for l, _ in lines))
+            os.replace(tmp, LOG)
+    say(f"sync: {done} finished tasks, {changed} rows written")
+
+
+FACTS = ("ts", "model", "effort", "models", "messages", "sub_messages", "weighted", "sub_weighted", "peak_context",
+         "compactions", "stamp")
+
+
+def count(ids, loaded, stamp):
+    rows, compacts = loaded
+    s = group([r for r in rows if r.session in ids], key=lambda r: 0).get(0)
+    # the model and effort of the last session: the ones the task ended on
+    own = group([r for r in rows if r.session == ids[-1]], key=lambda r: 0).get(0) or s
+    return s and dict(ts=s["last"].astimezone(timezone.utc).isoformat(timespec="seconds"), model=own["model"],
+                      effort=own["effort"], models=s["models"], messages=s["messages"], sub_messages=s["sub_messages"],
+                      weighted=round(s["weighted"]), sub_weighted=round(s["sub_weighted"]),
+                      peak_context=s["peak_context"], compactions=sum(compacts.get(t, 0) for t in ids), stamp=stamp)
+
+
+def outcome_row(run, aid, ids, facts, lines):
+    plan, out = run["plan"], run["outcome"]
+    kind = plan.get("type") if isinstance(plan.get("type"), str) else "unknown"
+    est = [r["estimate"] for _, r in lines if r and r.get("source") != "sync" and r.get("session") in ids
+           and r.get("task_type") == kind and r.get("estimate")]
+    row = dict(source="sync", schema=SCHEMA, prices=PRICES_DATE, task=run["task"], run=run["run"], session=ids[-1],
+               app_session=aid, sessions=ids, task_type=kind, size=plan.get("size"), planned_model=plan.get("model"),
+               planned_effort=plan.get("effort"), estimate=est[-1] if est else None, actual=facts["weighted"], **facts)
+    for src, keys in ((plan, ("override",)), (out, ("result", "rounds", "p0p1"))):
+        row.update({k: src[k] for k in keys if k in src})
+    return row
+
+
 def cmd_estimate(a):
-    rows = [r for r in read_jsonl(LOG) if r.get("task_type") == a.type]
+    rows = history(a.type)
+    new = [r for r in rows if not is_old(r)]
+    rows = new if len(new) >= MIN_LINES else rows
     for field, want in (("size", a.size), ("model", a.model)):
         same = [r for r in rows if want and r.get(field) == want]
         rows = same if len(same) >= MIN_LINES else rows
@@ -239,12 +584,14 @@ def cmd_estimate(a):
         v = sorted(r["actual"] for r in rows)
         lo, hi = v[len(v) // 4], v[-1 - len(v) // 4]
         src = f"{len(rows)} past '{a.type}' sessions (middle half of actuals)"
+        old = sum(map(is_old, rows))
+        src += f"; {old} of them by old accounting (other prices, or no subagents)" if old else ""
     else:
         if not (a.ctx and a.steps):
             sys.exit(f"only {len(rows)} past '{a.type}' lines (need {MIN_LINES}): too little history. "
                      "Give --ctx <context tokens> and --steps LO-HI to use context size x steps.")
         s_lo, s_hi = (int(x) for x in a.steps.split("-"))
-        (pi, po, pr), _ = price(a.model or UNKNOWN)
+        (pi, po, pr), _ = price(a.model or UNKNOWN, a.ctx)
         per = (a.ctx * pr + STEP_OUT * po + STEP_GROW * pi * W1H) / BASE
         lo, hi = per * s_lo, per * s_hi
         src = f"too little history ({len(rows)} lines): context {fmt(a.ctx)} x {s_lo}-{s_hi} steps"
@@ -253,6 +600,7 @@ def cmd_estimate(a):
     if c:
         print(f"  = {lo / c['per_pct']:.1f} - {hi / c['per_pct']:.1f}% of the limit "
               f"(calibration {c['date']}: {fmt(c['per_pct'])} per 1%, window '{c.get('window', '?')}')")
+        warn_old_cal(c)
     else:
         print(f"  percent unknown: no '{a.window}' calibration yet (run `calibrate`)")
 
@@ -268,7 +616,8 @@ def cmd_calibrate(a):
                  "wait for a bigger move.")
     tot = sum(s["weighted"] for s in scan(None, t1, t2).values())
     rec = {"date": datetime.now().date().isoformat(), "window": a.window, "from": t1.isoformat(),
-           "to": t2.isoformat(), "pct": d, "weighted": round(tot), "per_pct": round(tot / d)}
+           "to": t2.isoformat(), "pct": d, "weighted": round(tot), "per_pct": round(tot / d),
+           "schema": SCHEMA, "prices": PRICES_DATE}
     append(CAL, rec)
     print(f"{fmt(tot)} weighted over {d:g}% -> {fmt(rec['per_pct'])} per 1% (saved {rec['date']}). "
           f"Whole-percent readings: about +-{100 / d:.0f}% error here; other machines are not counted.")
@@ -276,7 +625,8 @@ def cmd_calibrate(a):
 
 def cmd_calibration(a):
     for c in read_jsonl(CAL):
-        print(f"{c['date']}  {c['pct']:g}% = {fmt(c['weighted'])}  -> {fmt(c['per_pct'])}/1%  [{c.get('window', '?')}]")
+        print(f"{c['date']}  {c['pct']:g}% = {fmt(c['weighted'])}  -> {fmt(c['per_pct'])}/1%  [{c.get('window', '?')}]"
+              + ("  old accounting (other prices, or no subagents)" if is_old(c) else f"  prices {c['prices']}"))
     if not os.path.exists(CAL):
         print("no calibrations yet")
 
@@ -297,6 +647,8 @@ def main():
     l.add_argument("--est", type=float, nargs=2, required=True, metavar=("LO", "HI")); l.add_argument("--effort", default="")
     l.add_argument("--size", choices=["S", "M", "L", "XL"])
     l.add_argument("--since", type=parse_time); l.add_argument("--until", type=parse_time); l.set_defaults(f=cmd_log)
+    y = sub.add_parser("sync"); y.add_argument("--quiet", action="store_true", help="print nothing")
+    y.set_defaults(f=cmd_sync)
     e = sub.add_parser("estimate"); e.add_argument("--type", required=True); e.add_argument("--ctx", type=int)
     e.add_argument("--steps"); e.add_argument("--model"); e.add_argument("--size", choices=["S", "M", "L", "XL"])
     e.add_argument("--window", default="weekly", help="which calibration to print percents with (weekly, 5h)")
