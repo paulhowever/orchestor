@@ -18,6 +18,7 @@ remote given as a URL, an unparsable line), it passes, because a wrong denial st
 miss is what the guard already allows for. Never asks, fails open.
 """
 import json, os, re, sys
+sys.dont_write_bytecode = True      # no __pycache__ in the plugin's install directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from hooklib import SKILL_DIR, deny, git, run
 

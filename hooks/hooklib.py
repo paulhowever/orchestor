@@ -1,7 +1,6 @@
 """Shared by the hooks of this plugin. Python 3.8+, standard library only, no network."""
 import json, os, re, subprocess, sys
 
-sys.dont_write_bytecode = True      # leave no __pycache__ in the plugin's install directory
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKILL_DIR = os.path.join(ROOT, "skills", "orchestrate")
 SKILL = os.path.join(SKILL_DIR, "SKILL.md")

@@ -11,6 +11,7 @@ setting is not read: there the hook stays silent.
 """
 import os, re, sys
 from datetime import datetime
+sys.dont_write_bytecode = True      # no __pycache__ in the plugin's install directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from hooklib import git, hard_rules, run
 

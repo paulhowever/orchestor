@@ -8,6 +8,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 SKILL = os.path.join(ROOT, "skills", "orchestrate", "SKILL.md")
 LAND = os.path.join(ROOT, "skills", "orchestrate", "land_check.py")
+sys.dont_write_bytecode = True
 sys.path.insert(0, HERE)
 import hooklib
 from session_start import tokens
@@ -455,6 +456,15 @@ class PushGuard(Base):
         r = self.raw(json.dumps(event).encode(), self.installed(without="skills/orchestrate/land_check.py"))
         self.assertEqual((r.returncode, r.stdout), (1, b""))
         self.assertIn(b"land_check", r.stderr)
+
+    def test_leaves_no_bytecode_behind(self):
+        script = self.installed(without="skills/orchestrate/usage.py")
+        self.env.pop("PYTHONDONTWRITEBYTECODE", None)
+        self.env.pop("PYTHONPYCACHEPREFIX", None)
+        self.send({"hook_event_name": "PreToolUse", "tool_name": "Bash", "cwd": self.wt,
+                   "tool_input": {"command": "git push origin HEAD:main"}}, script)
+        root = os.path.dirname(os.path.dirname(script))
+        self.assertEqual([d for d, _, _ in os.walk(root) if d.endswith("__pycache__")], [])
 
 
 if __name__ == "__main__":

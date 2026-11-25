@@ -9,6 +9,7 @@ Any other call passes silently: titles without a prompt, proposals started by id
 Checks form only, not whether the brief is right. Never asks, fails open.
 """
 import os, re, sys
+sys.dont_write_bytecode = True      # no __pycache__ in the plugin's install directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from hooklib import deny, hard_rules, run
 
